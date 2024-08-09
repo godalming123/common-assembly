@@ -22,29 +22,42 @@ type textAndPosition struct {
 	column int
 }
 
-// Iterates through each byte in `text` while updating the index, line, and column values accordingly
-func (text *textAndPosition) moveForward(charectersToMove int) {
-	for i := 0; i < charectersToMove && text.index < len(text.text); i++ {
-		if text.text[text.index] == '\n' {
-			text.column = 0
-			text.line += 1
-		}
-		text.index += 1
+// If `text.index` is already at the end of `text.text`, then the function
+// returns true. Otherwise the function increases `text.index` by one, while
+// handling newlines so that `text.line` and `text.column` are still valid
+// given `text.index`s new value.
+func (text *textAndPosition) moveForward() bool {
+	if text.index >= len(text.text)-1 {
+		return true
+	}
+	if text.text[text.index] == '\n' {
+		text.column = 0
+		text.line += 1
+	} else {
 		text.column += 1
 	}
+	text.index += 1
+	return false
 }
 
-// Continues iterating through `text` until the `checker` function returns true for the current byte
-func (text *textAndPosition) findUntil(checker func(byte) bool) {
-	for text.index < len(text.text) {
+// Runs the `checker` function with the current byte parsed as an argument and
+// then the `moveForward` function until either function returns true. If the
+// `checker` function returned true, then this function returns true. If the
+// `moveForward` function returned true, then this function returns false.
+func (text *textAndPosition) findUntil(checker func(byte) bool) bool {
+	for true {
 		if checker(text.text[text.index]) {
-			return
+			return true
 		}
-		text.moveForward(1)
+		if text.moveForward() {
+			return false
+		}
 	}
+	panic("Unreachable")
 }
 
-// Same as findUntil, but also returns the bytes that were iterated over
+// Same as `findUntil`, but returns the bytes that were iterated over instead
+// of true or false.
 func (text *textAndPosition) findUntilWithIteratedBytes(checker func(byte) bool) []byte {
 	start := text.index
 	text.findUntil(checker)
@@ -76,7 +89,8 @@ const (
 )
 
 func convertKeywordTypeToString(keywordType uint8) string {
-	// REALLY GO! IF WE HAD ENUM TYPES, THEN THIS WOULD BE AS SIMPLE AS `enumToString(keyword)`
+	// WHY CAN'T GO JUST HAVE ACTUAL ENUM TYPES? THEN THIS WOULD BE AS SIMPLE AS
+	// `enumToString(keywordType)`.
 	switch keywordType {
 	case Name:
 		return "Name"
@@ -184,11 +198,10 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 		line:   1,
 		column: 0,
 	}
-	text.findUntil(isNotWhitespace)
 	var keywords keywordList
 	var parsingErrors codeParsingErorList
 
-	for text.index < len(text.text) {
+	for text.findUntil(isNotWhitespace) {
 		var keywordType uint8 = UnknownKeywordType
 		keywordContents := []byte{}
 		keywordPositionLine := text.line
@@ -207,29 +220,32 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 		case '(', '{', '[':
 			keywordType = IncreaseNesting
 			keywordContents = []byte{text.text[text.index]}
-			text.moveForward(1)
+			text.moveForward()
 		case ')', '}', ']':
 			keywordType = DecreaseNesting
 			keywordContents = []byte{text.text[text.index]}
-			text.moveForward(1)
+			text.moveForward()
 
 		case '"':
 			keywordType = StringValue
 			keywordContents = []byte{'"'}
-			text.moveForward(1)
-			keywordContents = append(keywordContents, text.findUntilWithIteratedBytes(func(charecter byte) bool {
-				if charecter == '"' {
-					return true
-				}
-				return false
-			})...)
+			text.moveForward()
+			keywordContents = append(
+				keywordContents,
+				text.findUntilWithIteratedBytes(func(charecter byte) bool {
+					if charecter == '"' {
+						return true
+					}
+					return false
+				})...,
+			)
 			keywordContents = append(keywordContents, '"')
-			text.moveForward(1)
+			text.moveForward()
 
 		case ',', ':', '=', '|', '<', '>', '&', '+', '-', '*', '/', '.', '%':
 			// Get a list of consecutively used syntax symbols
 			keywordContents = append(keywordContents, text.text[text.index])
-			text.moveForward(1)
+			text.moveForward()
 			text.findUntil(func(charecter byte) bool {
 				if !isNotWhitespace(charecter) {
 					return false
@@ -242,7 +258,8 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 				return true
 			})
 
-			// Depending on what syntax symbols were consecutively used, add a keyword or create an error message
+			// Depending on what syntax symbols were consecutively used, add a keyword or
+			// create an error message.
 			switch string(keywordContents) {
 			case ":=", "::":
 				keywordType = VariableCreationSyntax
@@ -278,11 +295,13 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 		case '_':
 			keywordType = Name
 			keywordContents = []byte{text.text[text.index]}
-			text.moveForward(1)
+			text.moveForward()
 		case 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z':
 			keywordContents = text.findUntilWithIteratedBytes(func(charecter byte) bool {
-				if ('a' <= charecter && charecter <= 'z') || ('A' <= charecter && charecter <= 'Z') || ('0' <= charecter && charecter <= '9') {
+				if ('a' <= charecter && charecter <= 'z') ||
+					('A' <= charecter && charecter <= 'Z') ||
+					('0' <= charecter && charecter <= '9') {
 					return false
 				}
 				return true
@@ -307,11 +326,13 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 
 		default:
 			parsingErrors.append(codeParsingError{
-				errorMsg: errors.New("Unexpected charecter: `" + string(text.text[text.index]) + "`"),
-				line:     keywordPositionLine,
-				column:   keywordPositionColumn,
+				errorMsg: errors.New(
+					"Unexpected charecter: `" + string(text.text[text.index]) + "`",
+				),
+				line:   keywordPositionLine,
+				column: keywordPositionColumn,
 			})
-			text.moveForward(1)
+			text.moveForward()
 			continue
 		}
 
@@ -321,8 +342,6 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 			line:        keywordPositionLine,
 			column:      keywordPositionColumn,
 		})
-
-		text.findUntil(isNotWhitespace)
 	}
 
 	return parsedCode{
