@@ -1,0 +1,53 @@
+# Namespaced modules
+std :: import("std")
+
+#boolValue :: true
+#stringValue :: "Hello"
+#listValue :: [
+#	"John",
+#	"Jenny",
+#	"Doe",
+#]
+
+whiteSpaceCharecters :: [" ", "\n", "\t"]
+
+# Powerful type inference
+printNameWithoutExcessWhitespace :: (name, printLeadingWhitespace) {
+	switch name[0] {
+		case ...whiteSpaceCharecters {
+			fmt.print(" ")
+			printNameWithoutWhitespace(name[1..], false) # Tail call optimizations
+		}
+		default {
+			fmt.print(name[0])
+			printNameWithoutWhitespace(name[1..], true)
+		}
+	}
+}
+
+main :: () {
+	# Intuative for loops
+	# ALTERNATIVE SYNTAX (requires channels to be performant):
+	# (1.., std.os.args) |> forEach((index, name) {
+	# })
+	for (index, name) in (1.., std.os.args) {
+		std.print("Name number ${index}: ")
+
+ 		# TODO: Here no memory **should** be copied because the compiler should be
+		# smart enough to know that printNameWithoutExcessWhitespace does not mutate
+		# the name argument.
+		printNameWithoutExcessWhitespace(name, false)
+
+		std.print("\n")
+	}
+}
+
+# V0.2: Arbritary precision numbers
+# integarValue :: 4 # An integar with unlimited size
+# naturalValue :: 3n # Like above, but cannot be negative
+# float :: 2.48 # Like integarValue, but for floats
+# naturalFloat :: 2.48n # Like above, but cannot be negative
+
+# V0.2: First class concurrency concurrency
+# V0.2: Variant types?
+
