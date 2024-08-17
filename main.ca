@@ -1,0 +1,56 @@
+import std
+
+printNameWithoutExcessWhitespace :: (name arg byte, memory mut byte) {
+	// Since memory is not an arg, it's input does not effect the result
+	// of the function, and therefore the compiler forces that it cannot
+	// be used as an arg until it has been changed.
+	memory = 0
+			   
+	while memory < name.len {
+		switch name[memory] {
+			case " ", "\n", "\t" {
+				if printLeadingWhitespace {
+					std.print " "
+					printLeadingWhitespace = false
+				}
+			}
+			default {
+				std.print name[count]
+				printLeadingWhitespace = true
+			}
+		}
+		memory++
+	}
+}
+
+// Reads any number of charecter bytes from stdin. `stringSize` and `stringPtr`
+// are set to the size of the read string, and a pointer to the read string.
+readInput :: (stringSize mut byte, stringPtr mut *) {
+	mov stringSize, 100
+	alloc stringSize byte stringPtr
+	syscallRead stdin, stringPtr, stringSize
+}
+
+main :: (memory mut [8]byte) {
+	std.print("Enter text for the extra whitespace to be removed: ")
+	readInput(mut memory[0])
+	std.print("Name number ${index}: ")
+
+ 		# TODO: Here no memory **should** be copied because the compiler should be
+		# smart enough to know that printNameWithoutExcessWhitespace does not mutate
+		# the name argument.
+		printNameWithoutExcessWhitespace name, false
+
+		std.print "\n"
+	}
+}
+
+# V0.2: Arbritary precision numbers
+# integarValue :: 4 # An integar with unlimited size
+# naturalValue :: 3n # Like above, but cannot be negative
+# float :: 2.48 # Like integarValue, but for floats
+# naturalFloat :: 2.48n # Like above, but cannot be negative
+
+# V0.2: First class concurrency concurrency
+# V0.2: Variant types?
+

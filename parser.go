@@ -2,7 +2,7 @@ package main
 
 // Parser.go
 // =========
-// Responsible for parsing code into a list of keywords and errors
+// Responsible for parsing common assembly into a list of keywords and errors
 // that are encountered during the process.
 
 import (
@@ -16,7 +16,7 @@ import (
 
 // Stores a position within a piece of text
 type textAndPosition struct {
-	text   []byte
+	text   string
 	index  int
 	line   int
 	column int
@@ -56,9 +56,9 @@ func (text *textAndPosition) findUntil(checker func(byte) bool) bool {
 	panic("Unreachable")
 }
 
-// Same as `findUntil`, but returns the bytes that were iterated over instead
+// Same as `findUntil`, but returns the string that was iterated over instead
 // of true or false.
-func (text *textAndPosition) findUntilWithIteratedBytes(checker func(byte) bool) []byte {
+func (text *textAndPosition) findUntilWithIteratedString(checker func(byte) bool) string {
 	start := text.index
 	text.findUntil(checker)
 	return text.text[start:text.index]
@@ -68,30 +68,34 @@ func (text *textAndPosition) findUntilWithIteratedBytes(checker func(byte) bool)
 // KEYWORD TYPE //
 //////////////////
 
+type keywordType uint8
+
 const (
-	Name                       = iota // myVariableName3, _
-	StringValue                       // "John"
-	BoolValue                         // true, false
-	Number                            // 4, 23
-	Period                            // . - Can be used to create floats (3.2) or access values in structs (person.name)
-	IncreaseNesting                   // (, {, [
-	DecreaseNesting                   // ), }, ]
-	VariableCreationSyntax            // ::, :=
-	VariableModificationSyntax        // =
-	ControlFlowSyntax                 // for, if, if, else, |>
-	ComparisonSyntax                  // >, <, >=, <=, ||, &&
-	ListSyntax                        // ,
-	AntiListSyntax                    // ...
-	IterationSyntax                   // ..
-	MathSyntax                        // +, -, *, /
-	Comment                           // # My comment 2
+	Name                       keywordType = iota // myVariableName3, _
+	StringValue                                   // "John"
+	BoolValue                                     // true, false
+	Number                                        // 4, 23
+	Period                                        // . - Can be used to create floats (3.2) or access values in structs (person.name)
+	IncreaseNesting                               // (, {, [
+	DecreaseNesting                               // ), }, ]
+	VariableCreationSyntax                        // ::, :=
+	VariableModificationSyntax                    // =
+	ControlFlowSyntax                             // while, if, else
+	ComparisonSyntax                              // >, <, >=, <=, ||, &&
+	ListSyntax                                    // ,
+	AntiListSyntax                                // ...
+	IterationSyntax                               // ..
+	MathSyntax                                    // +, -, *, /
+	Comment                                       // # My comment 2
+	BuiltInFunction                               // syscall, import
+	Newline                                       // \n
 	UnknownKeywordType
 )
 
-func convertKeywordTypeToString(keywordType uint8) string {
+func convertKeywordTypeToString(typeToConvert keywordType) string {
 	// WHY CAN'T GO JUST HAVE ACTUAL ENUM TYPES? THEN THIS WOULD BE AS SIMPLE AS
 	// `enumToString(keywordType)`.
-	switch keywordType {
+	switch typeToConvert {
 	case Name:
 		return "Name"
 	case StringValue:
@@ -124,22 +128,19 @@ func convertKeywordTypeToString(keywordType uint8) string {
 		return "MathSyntax"
 	case Comment:
 		return "Comment"
+	case BuiltInFunction:
+		return "BuiltInFuction"
 	default:
 		return "UnknownKeywordType"
 	}
 }
 
 type keyword struct {
-	contents    []byte
-	keywordType uint8
+	contents    string
+	keywordType keywordType
+	nesting     uint8
 	line        int
 	column      int
-}
-
-type keywordList []keyword
-
-func (keywords *keywordList) append(keywordToAppend keyword) {
-	*keywords = append(*keywords, keywordToAppend)
 }
 
 /////////////////////////////
@@ -147,15 +148,10 @@ func (keywords *keywordList) append(keywordToAppend keyword) {
 /////////////////////////////
 
 type codeParsingError struct {
-	errorMsg error
-	line     int
-	column   int
-}
-
-type codeParsingErorList []codeParsingError
-
-func (codeParsingErrors *codeParsingErorList) append(codeParsingErrorToAppend codeParsingError) {
-	*codeParsingErrors = append(*codeParsingErrors, codeParsingErrorToAppend)
+	msg    error
+	line   int
+	column int
+	level  logLevel
 }
 
 //////////////////////
@@ -163,7 +159,7 @@ func (codeParsingErrors *codeParsingErorList) append(codeParsingErrorToAppend co
 //////////////////////
 
 type parsedCode struct {
-	keywords      keywordList
+	keywords      []keyword
 	parsingErrors []codeParsingError
 }
 
@@ -171,8 +167,8 @@ type parsedCode struct {
 // OTHER  HELPER CODE //
 ////////////////////////
 
-func isNotWhitespace(charecter byte) bool {
-	if charecter == ' ' || charecter == '\n' || charecter == '\t' {
+func isNotIgnoreableWhitespace(charecter byte) bool {
+	if charecter == ' ' || charecter == '\t' {
 		return false
 	}
 	return true
@@ -187,30 +183,40 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 	if err != nil {
 		return parsedCode{
 			parsingErrors: []codeParsingError{
-				{errorMsg: err},
+				{msg: err},
 			},
 		}
 	}
 
 	text := textAndPosition{
-		text:   rawText,
+		text:   string(rawText),
 		index:  0,
 		line:   1,
 		column: 0,
 	}
-	var keywords keywordList
-	var parsingErrors codeParsingErorList
+	var keywords []keyword
+	var parsingErrors []codeParsingError
+	var nesting uint8
 
-	for text.findUntil(isNotWhitespace) {
-		var keywordType uint8 = UnknownKeywordType
-		keywordContents := []byte{}
+	for text.findUntil(isNotIgnoreableWhitespace) {
+		keywordType := UnknownKeywordType
+		keywordContents := ""
 		keywordPositionLine := text.line
 		keywordPositionColumn := text.column
 
 		switch text.text[text.index] {
+		case '\n':
+			keywordType = Newline
+			keywordContents = "\n"
+			if text.moveForward() {
+				return parsedCode{
+					keywords:      keywords,
+					parsingErrors: parsingErrors,
+				}
+			}
 		case '#':
 			keywordType = Comment
-			keywordContents = text.findUntilWithIteratedBytes(func(charecter byte) bool {
+			keywordContents = text.findUntilWithIteratedString(func(charecter byte) bool {
 				if charecter == '\n' {
 					return true
 				}
@@ -219,40 +225,38 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 
 		case '(', '{', '[':
 			keywordType = IncreaseNesting
-			keywordContents = []byte{text.text[text.index]}
+			keywordContents = string(text.text[text.index])
 			text.moveForward()
 		case ')', '}', ']':
 			keywordType = DecreaseNesting
-			keywordContents = []byte{text.text[text.index]}
+			keywordContents = string(text.text[text.index])
+			nesting -= 1
 			text.moveForward()
 
 		case '"':
 			keywordType = StringValue
-			keywordContents = []byte{'"'}
+			keywordContents = "\""
 			text.moveForward()
-			keywordContents = append(
-				keywordContents,
-				text.findUntilWithIteratedBytes(func(charecter byte) bool {
-					if charecter == '"' {
-						return true
-					}
-					return false
-				})...,
-			)
-			keywordContents = append(keywordContents, '"')
+			keywordContents += text.findUntilWithIteratedString(func(charecter byte) bool {
+				if charecter == '"' {
+					return true
+				}
+				return false
+			})
+			keywordContents += "\""
 			text.moveForward()
 
 		case ',', ':', '=', '|', '<', '>', '&', '+', '-', '*', '/', '.', '%':
 			// Get a list of consecutively used syntax symbols
-			keywordContents = append(keywordContents, text.text[text.index])
+			keywordContents = string(text.text[text.index])
 			text.moveForward()
 			text.findUntil(func(charecter byte) bool {
-				if !isNotWhitespace(charecter) {
+				if !isNotIgnoreableWhitespace(charecter) {
 					return false
 				}
 				switch charecter {
 				case ':', '=', '|', '<', '>', '&', '+', '-', '*', '/', '.', '%':
-					keywordContents = append(keywordContents, charecter)
+					keywordContents += string(charecter)
 					return false
 				}
 				return true
@@ -260,13 +264,11 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 
 			// Depending on what syntax symbols were consecutively used, add a keyword or
 			// create an error message.
-			switch string(keywordContents) {
+			switch keywordContents {
 			case ":=", "::":
 				keywordType = VariableCreationSyntax
 			case "=":
 				keywordType = VariableModificationSyntax
-			case "|>":
-				keywordType = ControlFlowSyntax
 			case "==", "||", "&&", "<=", ">=", "<", ">":
 				keywordType = ComparisonSyntax
 			case "+", "-", "*", "/", "%":
@@ -280,10 +282,10 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 			case ".":
 				keywordType = Period
 			default:
-				parsingErrors.append(codeParsingError{
-					errorMsg: errors.New(
+				add(&parsingErrors, codeParsingError{
+					msg: errors.New(
 						"Unknown symbols series `" +
-							string(keywordContents) +
+							keywordContents +
 							"`. Known symbol serieses are (, {, [, ), }, ], #, :=, ::, =, |>, ==, ||, &&, <=, >=, <, >, +, -, *, /, %, ,, ..., .., .",
 					),
 					line:   keywordPositionLine,
@@ -294,11 +296,11 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 
 		case '_':
 			keywordType = Name
-			keywordContents = []byte{text.text[text.index]}
+			keywordContents = "_"
 			text.moveForward()
 		case 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z':
-			keywordContents = text.findUntilWithIteratedBytes(func(charecter byte) bool {
+			keywordContents = text.findUntilWithIteratedString(func(charecter byte) bool {
 				if ('a' <= charecter && charecter <= 'z') ||
 					('A' <= charecter && charecter <= 'Z') ||
 					('0' <= charecter && charecter <= '9') {
@@ -306,18 +308,20 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 				}
 				return true
 			})
-			switch string(keywordContents) {
-			case "if", "else", "for", "in":
+			switch keywordContents {
+			case "if", "else", "while":
 				keywordType = ControlFlowSyntax
 			case "true", "false":
 				keywordType = BoolValue
+			case "syscall", "import":
+				keywordType = BuiltInFunction
 			default:
 				keywordType = Name
 			}
 
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			keywordType = Number
-			keywordContents = text.findUntilWithIteratedBytes(func(charecter byte) bool {
+			keywordContents = text.findUntilWithIteratedString(func(charecter byte) bool {
 				if ('0' <= charecter && charecter <= '9') || charecter == '_' {
 					return false
 				}
@@ -325,8 +329,8 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 			})
 
 		default:
-			parsingErrors.append(codeParsingError{
-				errorMsg: errors.New(
+			add(&parsingErrors, codeParsingError{
+				msg: errors.New(
 					"Unexpected charecter: `" + string(text.text[text.index]) + "`",
 				),
 				line:   keywordPositionLine,
@@ -336,12 +340,20 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 			continue
 		}
 
-		keywords.append(keyword{
+		add(&keywords, keyword{
 			keywordType: keywordType,
 			contents:    keywordContents,
+			nesting:     nesting,
 			line:        keywordPositionLine,
 			column:      keywordPositionColumn,
 		})
+
+		if keywordType == IncreaseNesting {
+			// Increasing nesting must go after the keywords append operation so that
+			// the ({[ do not get counted as having increased nesting compared to the
+			// keyword before them.
+			nesting += 1
+		}
 	}
 
 	return parsedCode{

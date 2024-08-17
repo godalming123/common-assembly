@@ -1,37 +1,39 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 func main() {
-	parsedCode := convertFileIntoParsedCode("main.TODO")
-	fmt.Println(" Line   Column   Message")
-	fmt.Println(" ────   ──────   ───────")
-	for _, err := range parsedCode.parsingErrors {
-		fmt.Printf(" %4d   %6d   Error: %s\n", err.line, err.column, err.errorMsg)
+	fmt.Println("Parsing main.ca into a list of keywords...")
+	parsedCode := convertFileIntoParsedCode("basic.ca")
+	if len(parsedCode.parsingErrors) > 0 {
+		fmt.Println(" Line   Column   Error message from parsing to keywords")
+		fmt.Println(" ────   ──────   ──────────────────────────────────────")
 	}
-	for _, keyword := range parsedCode.keywords {
-		fmt.Printf(
-			" %4d   %6d   Keyword of type %-26s: `%s`\n",
-			keyword.line,
-			keyword.column,
-			convertKeywordTypeToString(keyword.keywordType),
-			keyword.contents,
-		)
+	for _, err := range parsedCode.parsingErrors {
+		fmt.Printf(" %4d   %6d   %s\n", err.line, err.column, err.msg)
 	}
 
-	//	err := os.WriteFile("assembly.s", []byte(
-	//		fmt.Sprintf(`
-	//
-	// .global _start
-	// .intel_syntax noprefix
-	//
-	// _start:
-	//
-	//	 %s`,
-	//				"HEllo",
-	//			),
-	//		), 0644)
-	//		if err != nil {
-	//			log.Fatal(err)
-	//		}
+	fmt.Println("Parsing keywords into assembly...")
+	parsingState := keywordParsingState{
+		currentKeyword:               0,
+		numberOfControlFlowJumpNames: 0,
+		targetArchitecture:           amd64,
+		targetOS:                     linux,
+		keywords:                     parsedCode.keywords,
+		inlineValues:                 []string{},
+		dataSectionText:              "",
+		functionStack:                []functionProperties{},
+	}
+	err := parsingState.parseFromBeginneng()
+	if err.msg != nil {
+		fmt.Println(" Line   Column   Error message from parsing to keywords")
+		fmt.Println(" ────   ──────   ──────────────────────────────────────")
+		fmt.Printf(" %4d   %6d   %s\n", err.line, err.column, err.msg)
+	}
+
+	fmt.Println("Writing assembly to main.asm...")
+	os.WriteFile("main.asm", []byte(parsingState.dataSectionText), 0644)
 }
