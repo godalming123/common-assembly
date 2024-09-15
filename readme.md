@@ -2,8 +2,70 @@
 
 The speed of assembly with good DX, and 1 codebase for many platforms.
 
+## Code example
+
+```
+# Prints the at `str` which is a pointer to a a list of charecters of length `strLen`
+print :: (str arg rsi, strLen arg rdx, mem1 mut rax, mem2 mut rdi) {
+	mem1 = 1
+	mem2 = 1
+	# TODO: Instead of `syscall`, for the user to say `syscall mut str, mut strLen, mut mem1, mut mem2` so that every possible mutation is explicit
+	syscall
+}
+
+printLetter :: (char mutArg rsi, mem1 mut rdx, mem2 mut rax, mem3 mut rdi) {
+  // TODO: Choose a syntx for switch statements
+  if char == {
+    'c', 'C':
+      char = "We don't like C\n"
+      mem1 = len .
+    'a' <= exp <= 'z':
+      char = "Char is a lower case letter.\n"
+      mem1 = len .
+    'A' <= exp <= 'Z':
+      char = "Char is an uppercase letter.\n"
+      mem1 = len .
+    '0' <= exp <= '9':
+      char = "Char is a number.\n"
+      mem1 = len .
+    else:
+      char = "Char is unknown.\n"
+      mem1 = len .
+  }
+  if char matches 'c', 'C' {
+    char = "We don't like C\n"
+    mem1 = len .
+  } else if matches 'a' <= exp <= 'z' {
+      char = "Char is a lower case letter.\n"
+      mem1 = len .
+  } else if mathces 'A' <= exp <= 'Z' {
+    char = "Char is an uppercase letter.\n"
+    mem1 = len .
+  } else if matches '0' <= exp <= '9' {
+      char = "Char is a number.\n"
+      mem1 = len .
+  } else {
+    char = "Char is unknown.\n"
+    mem1 = len .
+  }
+  print char, mem1, mut mem2, mut mem3
+}
+```
+
+## Performance tests
+
+- N-body simulation
+- Inexed access to a sequence of 12 integers
+- Generate mandlebrot set portable bitmap file
+- Calculations with arbritrary precesion arithmatic
+- Allocate, treverse, and deallocate binary trees
+
 ## TODO
 
+- Same DX as [high level assembly](https://github.com/hmhamza/hla-high-level-assembly-examples/blob/master/1.%20sumInputs.hla)
+- A way to enforce that a program follows some style guidelines by accesing the compiler, for example forcing a program to name variables following a certain convention
+- Assert that dumps the program state on failure
+- A way to debug code
 - Support control flow syntax
 - Handle jumping to the value at the current value on the stack at the end of a function
 - Handle reseting the stack after a function call
@@ -11,7 +73,7 @@ The speed of assembly with good DX, and 1 codebase for many platforms.
 - A couple optimizations
 - Support import
 
-## Improvements compared to regular assembly
+## DX Improvements compared to regular assembly
 
 - The same code works on many platforms.
 - No need to call functions by manually using `goto` and knowing exactly which register(s) they modify. Instead, use functions that just know the number of registers that they are using, if each register is an argument, and if they can modify the register. Then, they automatically use the stack to jump back to the caller.
@@ -103,3 +165,7 @@ And lots of OS's:
 ### Some other devtools
 
 - A way to generate documentation based on code comments
+
+# Code style
+
+- If you have more than 4 levels of indentation, then you need to refactor your code
