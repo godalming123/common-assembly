@@ -1,13 +1,14 @@
 package main
 
 // Lexer.go
-// ===================
+// ========
 // Responsible for parsing common assembly into a list of keywords and errors
 // that are encountered during the process.
 
 import (
 	"errors"
-	"os"
+	"fmt"
+	"strings"
 )
 
 ///////////////////////
@@ -88,7 +89,8 @@ const (
 	AntiListSyntax                                // ...
 	IterationSyntax                               // ..
 	Comment                                       // # My comment 2
-	BuiltInFunction                               // syscall, import
+	Syscall                                       // import
+	Import                                        // import
 	Newline                                       // \n
 	UnknownKeywordType
 )
@@ -98,6 +100,60 @@ type keyword struct {
 	keywordType keywordType
 	nesting     uint8
 	location    textLocation
+}
+
+// Displays a slice of keywords in a table
+func printKeywords(keywords []keyword) {
+	longestLine := 4
+	longestColumn := 6
+	longestNesting := 7
+	longestType := 12
+	longestContents := 16
+	for _, keyword := range keywords {
+		if len(fmt.Sprint(keyword.location.line)) > longestLine {
+			longestLine = len(fmt.Sprint(keyword.location.line))
+		}
+		if len(fmt.Sprint(keyword.location.column)) > longestColumn {
+			longestColumn = len(fmt.Sprint(keyword.location.column))
+		}
+		if len(fmt.Sprint(int(keyword.nesting))) > longestNesting {
+			longestNesting = len(fmt.Sprint(keyword.nesting))
+		}
+		if len(keyword.keywordType.String()) > longestType {
+			longestType = len(keyword.keywordType.String())
+		}
+		if len(strings.Replace(keyword.contents, "\n", "\\n", -1)) > longestContents {
+			longestContents = len(strings.Replace(keyword.contents, "\n", "\\n", -1))
+		}
+	}
+	printTableSymbolsRow(
+		topLeftQuarterCircle, horizontalLine, downTriad, topRightQuarterCircle,
+		longestLine, longestColumn, longestNesting, longestType, longestContents,
+	)
+	printTableRow([]tableCell{
+		{contents: "Line", width: longestLine},
+		{contents: "Column", width: longestColumn},
+		{contents: "Nesting", width: longestNesting},
+		{contents: "Keyword type", width: longestType},
+		{contents: "Keyword contents", width: longestContents},
+	})
+	printTableSymbolsRow(
+		rightTriad, horizontalLine, crossingLines, leftTriad,
+		longestLine, longestColumn, longestNesting, longestType, longestContents,
+	)
+	for _, keyword := range keywords {
+		printTableRow([]tableCell{
+			{contents: fmt.Sprint(keyword.location.line), width: longestLine, rightAligned: true},
+			{contents: fmt.Sprint(keyword.location.column), width: longestColumn, rightAligned: true},
+			{contents: fmt.Sprint(keyword.nesting), width: longestNesting, rightAligned: true},
+			{contents: keyword.keywordType.String(), width: longestType},
+			{contents: strings.Replace(keyword.contents, "\n", "\\n", -1), width: longestContents},
+		})
+	}
+	printTableSymbolsRow(
+		bottomLeftQuarterCircle, horizontalLine, upTriad, bottomRightQuarterCircle,
+		longestLine, longestColumn, longestNesting, longestType, longestContents,
+	)
 }
 
 /////////////////////////////
@@ -164,18 +220,9 @@ func numberToKeyword(text *textAndPosition) (keywordType, string) {
 	return keywordType, keywordContents
 }
 
-func convertFileIntoParsedCode(filePath string) parsedCode {
-	rawText, err := os.ReadFile(filePath)
-	if err != nil {
-		return parsedCode{
-			parsingErrors: []codeParsingError{
-				{msg: err},
-			},
-		}
-	}
-
+func lexCode(code string) parsedCode {
 	text := textAndPosition{
-		text:  string(rawText),
+		text:  code,
 		index: 0,
 		location: textLocation{
 			line:   1,
@@ -308,13 +355,15 @@ func convertFileIntoParsedCode(filePath string) parsedCode {
 				keywordType = BoolValue
 			case "mut", "arg", "mutArg":
 				keywordType = Mutatability
-			case "rsi", "rdx", "rax", "rdi", "ecx":
+			case "any", "rsi", "rdx", "rax", "rdi", "ecx":
 				// TODO: Rethink the register names so that they are not specefic to x86,
 				// and are easier to understand for people that come from higher level
 				// languages.
 				keywordType = Register
-			case "syscall", "import":
-				keywordType = BuiltInFunction
+			case "syscall":
+				keywordType = Syscall
+			case "import":
+				keywordType = Import
 			case "and", "or":
 				keywordType = ComparisonSyntax
 			default:

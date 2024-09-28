@@ -15,16 +15,16 @@ printNameWithoutExcessWhitespace :: (name arg byte, memory mut byte) {
 				}
 			}
 			default {
-				std.print name[count]
+				std.print name
 				printLeadingWhitespace = true
 			}
 		}
-		memory++
+		name++
 	}
 }
 
-// Reads any number of charecter bytes from stdin. `stringSize` and `stringPtr`
-// are set to the size of the read string, and a pointer to the read string.
+# Reads any number of charecter bytes from stdin. `stringSize` and `stringPtr`
+# are set to the size of the read string, and a pointer to the read string.
 readInput :: (stringSize mut byte, stringPtr mut *) {
 	mov stringSize, 100
 	alloc stringSize byte stringPtr

@@ -11,11 +11,11 @@ print :: (arg str rsi, arg strLen rdx, mut mem1 rax, mut mem2 rdi) {
 main :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx) {
 	mem3 = "Hello"
 	mem4 = 5
-	print mem3, mem4, mem1, mem2
+	print arg mem3, arg mem4, mut mem1, mut mem2
 	
 	mem3 = "World!\n"
 	mem4 = 7
-	print mem3, mem4, mem1, mem2
+	print arg mem3, arg mem4, mut mem1, mut mem2
 
 	mem1 = 60 # sys_exit syscall
 	mem2 = 5 # exit status
@@ -25,9 +25,23 @@ main :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx) {
 	syscall
 }
 
+pointIsOnScreen :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx, arg alwaysReturnTrue any, arg screenWidth any, arg screenHeight any, arg pointX any, arg pointY any) {
+  # This is to test the compilation of complex conditions
+  if 0 <= pointX < screenWidth or alwaysReturnTrue
+     and 0 <= pointY < screenHeight or alwaysReturnTrue {
+		mem3 = "TRUE"
+		mem4 = 5
+		print arg mem3, arg mem4, mut mem1, mut mem2
+	} else {
+		mem3 = "TRUE"
+		mem4 = 5
+		print arg mem3, arg mem4, mut mem1, mut mem2
+	}
+}
+
 # Calculates x^y. `x` is set to the result, and `y` is set to min(y, 1). Here
 # x any y could occupy any register since the code does not specify.
-pow :: (mut x, mutArg y) {
+pow :: (mut x any, mutArg y any) {
 	while y > 1 {
 		x *= x
 		y--
