@@ -3,32 +3,60 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 )
 
 func main() {
-	fmt.Println("Reading the text in basic.ca...")
-	rawText, err := os.ReadFile("basic.ca")
+	fileName := "main.ca"
+
+	fmt.Println("Reading the text in " + fileName + "...")
+	rawText, err := os.ReadFile(fileName)
 	if err != nil {
-		panic(err.Error())
+		println(err.Error())
+		os.Exit(1)
 	}
 
-	fmt.Println("Lexing basic.ca into a list of keywords...")
+	println("Lexing into a list of keywords...")
 	parsedCode := lexCode(string(rawText))
-	printErrorsInCode("basic.ca", strings.Split(string(rawText), "\n"), parsedCode.parsingErrors)
+	if printErrorsInCode(fileName, strings.Split(string(rawText), "\n"), parsedCode.parsingErrors) {
+		os.Exit(1)
+	}
 
-	fmt.Println("Parsing keywords into abstract syntax tree...")
+	println("Parsing keywords into abstract syntax tree...")
 	AST, error := keywordsToAST(parsedCode.keywords)
 	if error.msg != nil {
-		printErrorsInCode("basic.ca", strings.Split(string(rawText), "\n"), []codeParsingError{
-			error,
-		})
+		printErrorsInCode(fileName, strings.Split(string(rawText), "\n"), []codeParsingError{error})
+		os.Exit(1)
 	}
 
-	for _, ASTitem := range AST {
-		ASTitem.print(0)
+	println("Compiling abstract syntax tree into assembly...")
+	dataSectionText, textSectionAssembly, error := compileAssembly(AST)
+	if error.msg != nil {
+		printErrorsInCode(fileName, strings.Split(string(rawText), "\n"), []codeParsingError{error})
+		os.Exit(1)
 	}
 
-	// fmt.Println("Writing assembly to main.asm...")
-	// os.WriteFile("main.asm", []byte(parsingState.dataSectionText), 0644)
+	fmt.Println("Writing assembly to out.asm...")
+	err = os.WriteFile("out.asm", []byte(".global _start\n.text"+textSectionAssembly+dataSectionText+"\n"), 0644)
+	if err != nil {
+		println(err.Error())
+		os.Exit(1)
+	}
+
+	fmt.Println("Assembling assembly to out.o...")
+	out, err := exec.Command("as", "out.asm", "-o", "out.o").CombinedOutput()
+	print(string(out))
+	if err != nil {
+		println(err.Error())
+		os.Exit(1)
+	}
+
+	fmt.Println("Linking out.o to out...")
+	out, err = exec.Command("ld", "out.o", "-o", "out").CombinedOutput()
+	print(string(out))
+	if err != nil {
+		println(err.Error())
+		os.Exit(1)
+	}
 }

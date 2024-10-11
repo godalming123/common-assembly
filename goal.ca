@@ -1,0 +1,49 @@
+# The code in this file is currently completely experimental, and does not
+# compile since this file is designed as a place to experiment with what the
+# common assembly syntax could look like. This syntax is highly experimental
+# and subject to lots of change before a V1 release.
+
+import std
+
+printNameWithoutExcessWhitespace :: (mutArg name *byte, mutArg printLeadingWhitespace bool) {
+	while *name != '\0' do {
+		switch *name {
+			case " ", "\n", "\t" {
+				if printLeadingWhitespace {
+					std.print " "
+					printLeadingWhitespace = false
+				}
+			}
+			default {
+				std.print name
+				printLeadingWhitespace = true
+			}
+		}
+		name++
+	}
+}
+
+# Reads any number of charecter bytes from stdin using arena allocators.
+# `stringPtr` is set to the string that was read with a null terminator at the
+# end. Arena allocators are allocators that initialise themselves by reserving
+# a large contigous set of memory addresses in the address space. This does not
+# use any actual RAM. Then, when memory is allocated, the allocator tells the OS
+# to find chunks of actual memory for the addresses in the address space to
+# point to. More information: https://youtu.be/A9WLYbE0p-I
+readInput :: (alloc arenaAllocator, mut stringPtr *byte, mut internalStringPtr *byte) {
+	alloc.allocate stringPtr
+	internalStringPtr = stringPtr
+	while true do {
+		syscallReadCharecter stdin, internalStringPtr
+		if *internalStringPtr == '\0' { # The user stopped entering input
+			return
+		}
+		alloc.allocate internalStringPointer
+	}
+}
+
+main :: (alloc arenaAllocator, mut register1 byte, mut register2 byte) {
+	std.print "Enter text for the extra whitespace to be removed: "
+	readInput alloc, mut register1, mut register2
+	printNameWithoutExcessWhitespace mutArg register1, false
+}

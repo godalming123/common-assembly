@@ -83,14 +83,16 @@ const (
 	DecreaseNesting                               // ), }, ]
 	VariableCreationSyntax                        // ::
 	VariableModificationSyntax                    // =, ++, --, +=, -=, *=, /=, %=
-	ControlFlowSyntax                             // while, if, else
+	ControlFlowSyntax                             // while, if, else, elif
 	ComparisonSyntax                              // ==, !=, >, <, >=, <=, or, and
 	ListSyntax                                    // ,
 	AntiListSyntax                                // ...
 	IterationSyntax                               // ..
-	Comment                                       // # My comment 2
-	Syscall                                       // import
+	Syscall                                       // syscall
 	Import                                        // import
+	FunctionReturn                                // return
+	PointerOf                                     // ^
+	Comment                                       // # My comment 2
 	Newline                                       // \n
 	UnknownKeywordType
 )
@@ -280,7 +282,7 @@ func lexCode(code string) parsedCode {
 			keywordContents += "\""
 			text.moveForward()
 
-		case ',', ':', '=', '|', '<', '>', '&', '+', '-', '*', '/', '.', '%':
+		case ',', ':', '=', '|', '<', '>', '&', '+', '-', '*', '/', '.', '%', '!', '^':
 			// Get a list of consecutively used syntax symbols
 			keywordContents = string(text.text[text.index])
 			text.moveForward()
@@ -305,6 +307,8 @@ func lexCode(code string) parsedCode {
 				keywordType = VariableModificationSyntax
 			case "==", "!=", "<=", ">=", "<", ">":
 				keywordType = ComparisonSyntax
+			case "^":
+				keywordType = PointerOf
 			case "-": // The keyword is a negative number
 				text.moveForward()
 				if text.text[text.index] < '0' || text.text[text.index] > '9' {
@@ -355,13 +359,15 @@ func lexCode(code string) parsedCode {
 				keywordType = BoolValue
 			case "mut", "arg", "mutArg":
 				keywordType = Mutatability
-			case "any", "rsi", "rdx", "rax", "rdi", "ecx":
+			case "any", "rsi", "rdx", "rax", "rdi", "ecx", "rbx", "bl":
 				// TODO: Rethink the register names so that they are not specefic to x86,
 				// and are easier to understand for people that come from higher level
 				// languages.
 				keywordType = Register
 			case "syscall":
 				keywordType = Syscall
+			case "return":
+				keywordType = FunctionReturn
 			case "import":
 				keywordType = Import
 			case "and", "or":

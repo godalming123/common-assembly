@@ -1,56 +1,72 @@
-import std
+main :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx, mut mem5 bl) {
+	mem1 = 1               # Write syscall
+	mem2 = 1               # Stdout file descriptor
+	mem3 = "Hello world\n" # The text to be written
+	mem4 = 12              # The number of charecters to be written
+	syscall
+	
+	mem5 = 0
+	while 10 > mem5 {
+		mem1 = 1                  # Write syscall
+		mem2 = 1                  # Stdout file descriptor
+		mem3 = "Counting to 10\n" # The text to be written
+		mem4 = 15                 # The number of charecters to be written
+		syscall
+		mem5++
+	}
+	return
+}
 
-printNameWithoutExcessWhitespace :: (name arg byte, memory mut byte) {
-	// Since memory is not an arg, it's input does not effect the result
-	// of the function, and therefore the compiler forces that it cannot
-	// be used as an arg until it has been changed.
-	memory = 0
-			   
-	while memory < name.len {
-		switch name[memory] {
-			case " ", "\n", "\t" {
-				if printLeadingWhitespace {
-					std.print " "
-					printLeadingWhitespace = false
-				}
-			}
-			default {
-				std.print name
-				printLeadingWhitespace = true
-			}
-		}
-		name++
+pointIsOnScreen :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx, arg alwaysReturnTrue any, arg false1InsteadOf2 any, arg screenWidth any, arg screenHeight any, arg pointX any, arg pointY any) {
+	# This is just to test the compilation of complex conditions
+	# TODO: Add () to the order of operations for expressions so alwaysReturnTrue
+	# is only referenced once
+	if 0 <= pointX < screenWidth or alwaysReturnTrue != 0
+    	and 0 <= pointY < screenHeight or alwaysReturnTrue != 0 {
+		mem3 = "TRUE"
+		mem4 = 4
+		print arg mem3, arg mem4, mut mem1, mut mem2
+	} elif false1InsteadOf2 != 0 {
+		mem3 = "FALSE1"
+		mem4 = 6
+		print arg mem3, arg mem4, mut mem1, mut mem2
+	} else {
+		mem3 = "FALSE2"
+		mem4 = 6
+		print arg mem3, arg mem4, mut mem1, mut mem2
+	}
+	if pointX == pointY {
+		mem3 = "The x is the same as the y"
+		mem4 = 26
+		print arg mem3, arg mem4, mut mem1, mut mem2
 	}
 }
 
-# Reads any number of charecter bytes from stdin. `stringSize` and `stringPtr`
-# are set to the size of the read string, and a pointer to the read string.
-readInput :: (stringSize mut byte, stringPtr mut *) {
-	mov stringSize, 100
-	alloc stringSize byte stringPtr
-	syscallRead stdin, stringPtr, stringSize
-}
-
-main :: (memory mut [8]byte) {
-	std.print("Enter text for the extra whitespace to be removed: ")
-	readInput(mut memory[0])
-	std.print("Name number ${index}: ")
-
- 		# TODO: Here no memory **should** be copied because the compiler should be
-		# smart enough to know that printNameWithoutExcessWhitespace does not mutate
-		# the name argument.
-		printNameWithoutExcessWhitespace name, false
-
-		std.print "\n"
+# Calculates x^y. `x` is set to the result, and `y` is set to min(y, 1). Here
+# x and y could occupy any register since the code does not specify.
+pow :: (mut x any, mutArg y any) {
+	while y > 1 {
+		x *= x
+		y--
 	}
+	# TODO: Support this updated code that uses the `loop` insruction in x86
+	# assembly to be faster
+	# if y <= 1 {
+	# 	return
+	# }
+	# y--
+	# do {
+	# 	x *= x
+	# } while decAndContinueIfNotZero mutArg y
+
+	# The code above compiles to the following x86-64 assembly:
+	# cmp ecx, 1
+	# jle end ; If ecx <= 0, jump to end
+	# dec ecx
+	# loop:
+	#     mul x, x
+	#     ; Exactly like `dec ecx`, then `jnz loop`, except it doesn't set flags,
+	#     ; and is faster
+	#     loop loop
+	# end:
 }
-
-# V0.2: Arbritary precision numbers
-# integarValue :: 4 # An integar with unlimited size
-# naturalValue :: 3n # Like above, but cannot be negative
-# float :: 2.48 # Like integarValue, but for floats
-# naturalFloat :: 2.48n # Like above, but cannot be negative
-
-# V0.2: First class concurrency concurrency
-# V0.2: Variant types?
-

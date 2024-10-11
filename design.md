@@ -1,4 +1,4 @@
-## Programming language design considerations
+# Programming language design considerations
 
 <table>
   <tr>
@@ -43,17 +43,7 @@
   </tr>
 </table>
 
-## Common assembly design montra
-
-- OOP
-  - Doesn't need anyone else to ditest the verbose syntax, and program structuring which gives the impression of objects being structured into a tree at first glance, but ends up as a free-for-all as objects store references to other objects that are in completely different places in the "tree"
-- Functional
-  - Pretends that side affects do not exist, when in reality all input and output is a side affect
-  - Pretends that mutation does not exist, when in reality all syscall require mutating registers to do anything
-- Data oriented
-- Procedural
-- Rust
-  - Uses the compiler to ensure that the program is correct
+# Common assembly design montra
 
 - Stop using compiler "magic" to ensure that the program is correct, and that the binary runs fast. Instead, create a syntax that shows how the program is ineffecient, and the programmer will optimize their code better then any machine could.
 - Stop hiding undefined behavior behind "pure" functional abstractions that pretend errors never happen. Instead, make a syntax that defines the undefined behavior, and forces the programmer to handle it, then the programmer can be sure that the program is correct.

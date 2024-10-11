@@ -35,11 +35,11 @@ const (
 // Prints each error in `errors` with the 10 lines of code around where the
 // error occured. Assumes that `errors` is in order of their `location.line`
 // property.
-func printErrorsInCode(fileName string, fileLines []string, errors []codeParsingError) {
+func printErrorsInCode(fileName string, fileLines []string, errors []codeParsingError) bool {
 	if len(errors) == 0 {
-		return
+		return false
 	}
-	println(ansiBold, "===============", len(errors), "errors encountered while parsing", fileName, "===============", ansiReset)
+	println(ansiBold, "===============", len(errors), "errors encountered in", fileName, "===============", ansiReset)
 	charectersNeededForLineNumber := len(fmt.Sprint(len(fileLines)))
 	currentErrorIndex := 0
 	shouldContinue := true
@@ -76,6 +76,7 @@ func printErrorsInCode(fileName string, fileLines []string, errors []codeParsing
 			lineNumber++
 		}
 	}
+	return true
 }
 
 func printTableSymbolsRow(
@@ -190,33 +191,12 @@ func (list *listIterator[T]) get() *T {
 	return &list.list[list.currentIndex]
 }
 
-// Logs each error generated from parsing a block of code
-//func logErrorsInText(text textAndPosition, errors []codeParsingError) {
-//	codeParsingErrorIndex := 0
-//	text.index = 0
-//	text.line = 0
-//	text.column = 0
-//	for ()) {
-//		if code[index] == '\n' {
-//			// TODO: Print line numbers
-//			line++
-//			if line > (errors[codeParsingErrorIndex].line - 5) {
-//				printingFile = true
-//				if line == errors[codeParsingErrorIndex].line {
-//					// TODO: Actually print the error messages
-//				}
-//			} else if line > (errors[codeParsingErrorIndex].line + 5) {
-//				printingFile = false
-//			}
-//		}
-//		if printingFile {
-//			print(code[index])
-//		}
-//	}
-//
-//}
-
 // Appends to the end of a slice.
-func add[T any](slice *[]T, itemToAppend T) {
-	*slice = append(*slice, itemToAppend)
+func add[T any](slice *[]T, itemToAppend ...T) {
+	*slice = append(*slice, itemToAppend...)
+}
+
+// Inserts at the beginning of a slice.
+func insert[T any](slice *[]T, itemToInsert T) {
+	*slice = append([]T{itemToInsert}, *slice...)
 }

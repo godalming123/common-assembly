@@ -25,24 +25,32 @@ const (
 	ImportStatement
 	WhileLoop
 	IfStatement
-	ElifStatement
 	ElseStatement
 	FunctionDefintion
 	FunctionArgs
 	FunctionArg
+	Return
 	ArgMutatability
 	ArgRegister
 	FunctionCall
-	AssemblyFunctionCall
-	ComparisonValue
-	GreatnessChainItemsCanBeEqual    // <=, >=
-	GreatnessChainItemsCannotBeEqual // <, >
+	AssemblySyscall
+
+	ValueComparison  // >, <, >=, <=, ==, !=
+	BooleanLogic     // and, or
+	VariableMutation // mov, add, sub, mul, div, mod
+
+	PointerOfVariable
+	String
+	Int
+	Float
+	VarName
 )
 
 type AbstractSyntaxTreeItem struct {
 	itemType possibleAbstractSyntaxTreeItem
 	name     string
 	contents []AbstractSyntaxTreeItem
+	location textLocation
 }
 
 func (AST AbstractSyntaxTreeItem) print(indentation int) {
@@ -83,92 +91,127 @@ func conditionToAST(keywords []keyword) (AbstractSyntaxTreeItem, codeParsingErro
 	return comparisonToAST(keywords)
 }
 
+func parseValue(keyword keyword) (AbstractSyntaxTreeItem, codeParsingError) {
+	var ASTitemType possibleAbstractSyntaxTreeItem
+	switch keyword.keywordType {
+	case Name:
+		ASTitemType = VarName
+	case IntNumber:
+		ASTitemType = Int
+	case FloatNumber:
+		ASTitemType = Float
+	case StringValue:
+		ASTitemType = String
+		assert(keyword.contents[0] == '"' && keyword.contents[len(keyword.contents)-1] == '"')
+		keyword.contents = keyword.contents[1 : len(keyword.contents)-1]
+	default:
+		return AbstractSyntaxTreeItem{}, codeParsingError{
+			msg:      errors.New("While parsing value, unexpected keyword type " + keyword.keywordType.String() + " expecting a keyword of type Name, IntNumber, FloatNumber, or StringValue"),
+			location: keyword.location,
+		}
+	}
+	return AbstractSyntaxTreeItem{
+		name:     keyword.contents,
+		itemType: ASTitemType,
+		location: keyword.location,
+	}, codeParsingError{}
+}
+
+func nextNonEmpty(keywords *listIterator[keyword]) bool {
+	for true {
+		if !keywords.next() {
+			return false
+		}
+		if keywords.get().keywordType != Newline &&
+			keywords.get().keywordType != Comment {
+			return true
+		}
+	}
+	panic("Unreachable")
+}
+
 // Parses a comparison into an AST node. `keywords` cannot contain a keyword
 // where `contents == "and" || contents == "or"`, or else this function will
 // panic. If `keywords` may contain a keyword where
 // `contents == "and" || contents == "or"`, then use `conditionToAST`.
-func comparisonToAST(keywords []keyword) (AbstractSyntaxTreeItem, codeParsingError) {
-	const equalCmp = '='
-	const notEqualCmp = '!'
-	const ascendingCmp = '<'
-	const descendingCmp = '>'
+func comparisonToAST(keywordList []keyword) (AbstractSyntaxTreeItem, codeParsingError) {
+	assert(len(keywordList) > 0)
+
 	var comparisonType byte
+	comparisonClauses := []AbstractSyntaxTreeItem{}
+	keywords := listIterator[keyword]{list: keywordList}
 
-	comparisonContentsAST := []AbstractSyntaxTreeItem{}
-	comparisonIsValidKeyword := false
-	for _, keyword := range keywords {
-		if keyword.keywordType == ComparisonSyntax {
-			if !comparisonIsValidKeyword {
-				return AbstractSyntaxTreeItem{}, codeParsingError{
-					msg:      errors.New("Unexpected comparison, comparisons can only go between values that are being compared."),
-					location: keyword.location,
-				}
-			}
-
-			if comparisonType == 0 {
-				// If `comparisonType` is 0, then we set `comparisonType` to something other
-				// then 0.
-				comparisonType = keyword.contents[0]
-				if comparisonType != equalCmp &&
-					comparisonType != notEqualCmp &&
-					comparisonType != ascendingCmp &&
-					comparisonType != descendingCmp {
-					panic("Unexpected internal state: `comparisonToAST` expects all keywords of type `ComparisonSyntax` to start with either `=`, `!`, `<`, `>`, since they cannot be `and`/`or`.")
-				}
-			} else if comparisonType == notEqualCmp {
-				// Because of the above comment, if `comparisonType` is not 0, then this is
-				// after the first `keyword` of type `ComparisonSyntax` in `keywords`,
-				// therefore this is a chain. Not equal comparisons cannot be chained.
-				return AbstractSyntaxTreeItem{}, codeParsingError{
-					msg:      errors.New("Not equal comparisons cannot be chained."),
-					location: keyword.location,
-				}
-			}
-
-			switch comparisonType {
-			case ascendingCmp, descendingCmp:
-				switch keyword.contents {
-				case "<=", ">=":
-					add(&comparisonContentsAST, AbstractSyntaxTreeItem{itemType: GreatnessChainItemsCanBeEqual})
-				case "<", ">":
-					add(&comparisonContentsAST, AbstractSyntaxTreeItem{itemType: GreatnessChainItemsCannotBeEqual})
-				default:
-					return AbstractSyntaxTreeItem{}, codeParsingError{
-						msg:      errors.New("While parsing comparison of type greatness chain, expecting either <=, >=, <, > as comparison keywords. Got: `" + keyword.contents + "`."),
-						location: keyword.location,
-					}
-				}
-			case equalCmp:
-				if keyword.contents != "==" {
-					return AbstractSyntaxTreeItem{}, codeParsingError{
-						msg:      errors.New("Every comparison in equal chain should be `==`"),
-						location: keyword.location,
-					}
-				}
-			default:
-				panic("Unexpected internal state")
-			}
-			comparisonIsValidKeyword = false
-		} else if keyword.keywordType != Newline && keyword.keywordType != Comment {
-			// TODO: Do more parsing of the values between the comparisons
-			add(&comparisonContentsAST, AbstractSyntaxTreeItem{
-				itemType: ComparisonValue,
-				name:     keyword.contents,
-			})
-			comparisonIsValidKeyword = true
+	for true {
+		comparisonFirstArg, err := parseValue(*keywords.get())
+		if err.msg != nil {
+			return AbstractSyntaxTreeItem{}, err
 		}
-	}
 
-	comparisonFunction := string(comparisonType)
-	if comparisonFunction == "=" || comparisonFunction == "!" {
-		comparisonFunction += "="
-	}
+		if !nextNonEmpty(&keywords) {
+			if keywords.currentIndex == 0 {
+				return AbstractSyntaxTreeItem{}, codeParsingError{
+					location: keywords.get().location,
+					msg:      errors.New("Unexpected end of comparison, expecting either >, >=, <, <=, ==, or !="),
+				}
+			} else if len(comparisonClauses) == 1 {
+				return comparisonClauses[0], codeParsingError{}
+			} else {
+				return AbstractSyntaxTreeItem{
+					itemType: ValueComparison,
+					name:     "and",
+					contents: comparisonClauses,
+					location: keywordList[0].location,
+				}, codeParsingError{}
+			}
+		}
 
-	return AbstractSyntaxTreeItem{
-		itemType: AssemblyFunctionCall,
-		name:     comparisonFunction,
-		contents: comparisonContentsAST,
-	}, codeParsingError{}
+		if comparisonType == 0 {
+			comparisonType = keywords.get().contents[0]
+			if comparisonType != '=' && comparisonType != '!' &&
+				comparisonType != '<' && comparisonType != '>' {
+				panic("Unexpected internal state: `comparisonToAST` got a keyword with " +
+					"contents `" +
+					keywords.get().contents +
+					"` expecting the keyword contents to start with either =, !, <, >.")
+			}
+		} else {
+			if comparisonType != keywords.get().contents[0] {
+				return AbstractSyntaxTreeItem{}, codeParsingError{
+					location: keywords.get().location,
+					msg:      errors.New("Expecting comparisons in greatness chain to match"),
+				}
+			}
+			if comparisonType == '!' {
+				return AbstractSyntaxTreeItem{}, codeParsingError{
+					location: keywords.get().location,
+					msg:      errors.New("You cannot chain comparisons of type !"),
+				}
+			}
+		}
+
+		if !nextNonEmpty(&keywords) {
+			return AbstractSyntaxTreeItem{}, codeParsingError{
+				location: keywords.get().location,
+				msg:      errors.New("Unexpected end of comparison, expecting value"),
+			}
+		}
+
+		comparisonSecondArg, err := parseValue(*keywords.get())
+		if err.msg != nil {
+			return AbstractSyntaxTreeItem{}, err
+		}
+
+		add(&comparisonClauses, AbstractSyntaxTreeItem{
+			itemType: ValueComparison,
+			name:     keywordList[keywords.currentIndex-1].contents,
+			location: keywordList[keywords.currentIndex-1].location,
+			contents: []AbstractSyntaxTreeItem{
+				comparisonFirstArg,
+				comparisonSecondArg,
+			},
+		})
+	}
+	panic("Unreachable")
 }
 
 func conditionClausesToAST(clauses [][]keyword, conditionFunctionName string) (AbstractSyntaxTreeItem, codeParsingError) {
@@ -181,7 +224,8 @@ func conditionClausesToAST(clauses [][]keyword, conditionFunctionName string) (A
 		add(&conditionClausesAST, clauseASTitem)
 	}
 	return AbstractSyntaxTreeItem{
-		itemType: AssemblyFunctionCall,
+		location: clauses[0][0].location,
+		itemType: BooleanLogic,
 		name:     conditionFunctionName,
 		contents: conditionClausesAST,
 	}, codeParsingError{}
@@ -192,6 +236,9 @@ func conditionClausesToAST(clauses [][]keyword, conditionFunctionName string) (A
 // block, and then concatonating the result into one AST item of type
 // `ASTitemType`.
 func conditionalBlockToAST(keywords *listIterator[keyword], ASTitemType possibleAbstractSyntaxTreeItem) (AbstractSyntaxTreeItem, codeParsingError) {
+	// Save the location
+	location := keywords.get().location
+
 	// Ignore the first keyword
 	if !keywords.next() {
 		return AbstractSyntaxTreeItem{}, codeParsingError{
@@ -228,7 +275,52 @@ func conditionalBlockToAST(keywords *listIterator[keyword], ASTitemType possible
 	return AbstractSyntaxTreeItem{
 		itemType: ASTitemType,
 		contents: append([]AbstractSyntaxTreeItem{conditionAST}, blockAST...),
+		location: location,
 	}, codeParsingError{}
+}
+
+func ifStatementToAST(keywords *listIterator[keyword]) (AbstractSyntaxTreeItem, codeParsingError) {
+	// Parse if block
+	out, err := conditionalBlockToAST(keywords, IfStatement)
+	if err.msg != nil {
+		return AbstractSyntaxTreeItem{}, err
+	}
+
+	// Parse else block if there is one
+	if keywords.currentIndex+1 < len(keywords.list) {
+		if keywords.list[keywords.currentIndex+1].contents == "elif" {
+			assert(keywords.next())
+			elifBlock, err := ifStatementToAST(keywords)
+			if err.msg != nil {
+				return AbstractSyntaxTreeItem{}, err
+			}
+			add(&out.contents, AbstractSyntaxTreeItem{
+				location: elifBlock.location,
+				itemType: ElseStatement,
+				contents: []AbstractSyntaxTreeItem{elifBlock},
+			})
+		} else if keywords.list[keywords.currentIndex+1].contents == "else" {
+			assert(keywords.next())
+			if !keywords.next() {
+				return AbstractSyntaxTreeItem{}, codeParsingError{
+					msg:      errors.New("Unexpected end of block. Either remove the else, or add a block after the else."),
+					location: keywords.get().location,
+				}
+			}
+			elseBlockContents, err := blockToAST(keywords)
+			if err.msg != nil {
+				return AbstractSyntaxTreeItem{}, err
+			}
+			add(&out.contents, AbstractSyntaxTreeItem{
+				location: elseBlockContents[0].location,
+				itemType: ElseStatement,
+				contents: elseBlockContents,
+			})
+		}
+	}
+
+	// Return
+	return out, codeParsingError{}
 }
 
 func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, codeParsingError) {
@@ -242,23 +334,32 @@ func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, code
 
 	ASTitems := []AbstractSyntaxTreeItem{}
 
-	// Parse each statment inside the block
-	for keywords.next() {
+	// Parse each statement inside the block
+	for nextNonEmpty(keywords) {
 		switch keywords.get().keywordType {
-
-		// Do nothing for newlines, and comments
-		case Newline, Comment:
+		case FunctionReturn:
+			if nextNonEmpty(keywords) && keywords.get().contents == "}" {
+				return append(ASTitems, AbstractSyntaxTreeItem{
+					location: keywords.list[keywords.currentIndex-1].location,
+					itemType: Return,
+				}), codeParsingError{}
+			}
+			return []AbstractSyntaxTreeItem{}, codeParsingError{
+				location: keywords.get().location,
+				msg:      errors.New("After return, next keyword must be } to close the scope"),
+			}
 
 		case Syscall:
 			add(&ASTitems, AbstractSyntaxTreeItem{
-				itemType: AssemblyFunctionCall,
-				name:     "syscall",
+				location: keywords.get().location,
+				itemType: AssemblySyscall,
 			})
 
 		// Statements that start with a name can either be a function call, a function definition, or a variable mutation
 		case Name:
-			name := keywords.get().contents
-			if !keywords.next() {
+			location := keywords.get().location
+			name := keywords.get()
+			if !nextNonEmpty(keywords) {
 				return []AbstractSyntaxTreeItem{}, codeParsingError{
 					msg:      errors.New("During the parsing of statement that starts with a name, unexpected end of keywords slice."),
 					location: keywords.get().location,
@@ -274,69 +375,78 @@ func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, code
 				case "-=", "--":
 					functionCall = "sub"
 				case "*=":
-					functionCall = "mul" // TODO: Optimize: Use `add name, name` instaed of `mul name, 2`
+					// TODO: Optimize: Use `add name, name` instead of `mul name, 2`
+					functionCall = "mul"
 				case "/=":
 					functionCall = "div"
 				case "%=":
 					functionCall = "mod"
 				case "=":
-					functionCall = "mov" // TODO: Optimize: Use xor instead of move if the value is being set to 0 becuase it is quicker
+					// TODO: Optimize: Use xor instead of move if the value is being set to 0
+					// becuase it is quicker
+					functionCall = "mov"
 				default:
 					panic("Unexpected internal state: `stringToKeywords.go` should not produce a keyword of type VariableModifucationSyntax that has contents other then `+=`, `++`, `-=`, `--`, `*=`, `/=`, `%=`, or `=`.")
 				}
-				// Parse function value
-				functionValue := ""
+				// Parse function first value
+				functionValue1 := AbstractSyntaxTreeItem{
+					location: keywords.get().location,
+				}
 				switch keywords.get().contents {
 				case "++", "--":
-					functionValue = "1"
-				case "=":
-					if !keywords.next() {
+					functionValue1.itemType = Int
+					functionValue1.name = "1"
+				case "=", "+=", "-=", "*=", "/=", "%=":
+					if !nextNonEmpty(keywords) {
 						return []AbstractSyntaxTreeItem{}, codeParsingError{
-							msg:      errors.New("After =, unexpected end of keywords."),
+							msg:      errors.New("After " + keywords.get().contents + ", unexpected end of keywords."),
 							location: keywords.get().location,
 						}
 					}
-					switch keywords.get().keywordType {
 					// TODO: Maybe we should support defining a variable as the result of a comparison
-					case StringValue, BoolValue, IntNumber, FloatNumber:
-						functionValue = keywords.get().contents
-					default:
-						return []AbstractSyntaxTreeItem{}, codeParsingError{
-							msg:      errors.New("After =, next keyword must be of type StringValue, BoolValue, IntNumber or FloatNumber. Got a keyword of type `" + keywords.get().keywordType.String() + "`."),
-							location: keywords.get().location,
+					if keywords.get().keywordType == PointerOf {
+						if !keywords.next() {
+							return []AbstractSyntaxTreeItem{}, codeParsingError{
+								location: keywords.get().location,
+								msg:      errors.New("Unexpected end of keywords"),
+							}
 						}
-					}
-				case "+=", "-=", "*=", "/=", "%=":
-					if !keywords.next() {
-						return []AbstractSyntaxTreeItem{}, codeParsingError{
-							msg:      errors.New("After +=, -=, *=, /=, or %=, unexpected end of keywords."),
-							location: keywords.get().location,
+						if keywords.get().keywordType != Name {
+							return []AbstractSyntaxTreeItem{}, codeParsingError{
+								location: keywords.get().location,
+								msg:      errors.New("During parsing of variable mutation, after ^, a keyword of type name, got a keyword of type " + keywords.get().keywordType.String() + "."),
+							}
 						}
-					}
-					switch keywords.get().keywordType {
-					// TODO: Maybe we should support defining a variable as the result of a comparison
-					case IntNumber, FloatNumber, Name:
-						functionValue = keywords.get().contents
-					default:
-						return []AbstractSyntaxTreeItem{}, codeParsingError{
-							msg:      errors.New("After +=, -=, *=, /=, or %=, next keyword must be of type IntNumber, FloatNumber, or Name. Got a keyword of type `" + keywords.get().keywordType.String() + "`."),
-							location: keywords.get().location,
+						if functionCall != "mov" {
+							return []AbstractSyntaxTreeItem{}, codeParsingError{
+								location: keywords.get().location,
+								msg:      errors.New("During parsing of variable mutation, ^ can only be used with ="),
+							}
+						}
+						functionCall = "movq"
+						functionValue1.itemType = VarName
+						functionValue1.name = keywords.get().contents
+					} else {
+						var err codeParsingError
+						functionValue1, err = parseValue(*keywords.get())
+						if err.msg != nil {
+							return []AbstractSyntaxTreeItem{}, err
 						}
 					}
 				}
+				// Parse function second value
+				functionValue2, err := parseValue(*name)
+				if err.msg != nil {
+					return []AbstractSyntaxTreeItem{}, err
+				}
 				// Append to ASTitems
 				add(&ASTitems, AbstractSyntaxTreeItem{
-					itemType: AssemblyFunctionCall,
+					location: location,
+					itemType: VariableMutation,
 					name:     functionCall,
 					contents: []AbstractSyntaxTreeItem{
-						{
-							itemType: FunctionArg,
-							name:     name,
-						},
-						{
-							itemType: FunctionArg,
-							name:     functionValue,
-						},
+						functionValue1,
+						functionValue2,
 					},
 				})
 			case VariableCreationSyntax:
@@ -351,8 +461,9 @@ func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, code
 					return []AbstractSyntaxTreeItem{}, err
 				}
 				add(&ASTitems, AbstractSyntaxTreeItem{
+					location: location,
 					itemType: FunctionDefintion,
-					name:     name,
+					name:     name.contents,
 					contents: function,
 				})
 			case Mutatability:
@@ -362,8 +473,9 @@ func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, code
 					return []AbstractSyntaxTreeItem{}, err
 				}
 				add(&ASTitems, AbstractSyntaxTreeItem{
+					location: location,
 					itemType: FunctionCall,
-					name:     name,
+					name:     name.contents,
 					contents: functionArgsASTitems,
 				})
 			default:
@@ -384,40 +496,11 @@ func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, code
 		case ControlFlowSyntax:
 			switch keywords.get().contents {
 			case "if":
-				conditionalBlock, err := conditionalBlockToAST(keywords, IfStatement)
+				conditionalBlock, err := ifStatementToAST(keywords)
 				if err.msg != nil {
 					return []AbstractSyntaxTreeItem{}, err
 				}
 				add(&ASTitems, conditionalBlock)
-				if !keywords.next() {
-					return []AbstractSyntaxTreeItem{}, codeParsingError{
-						msg:      errors.New("Unexpected end of block. Try adding '}'"),
-						location: keywords.get().location,
-					}
-				}
-				for keywords.get().contents == "elif" {
-					conditionalBlock, err := conditionalBlockToAST(keywords, ElifStatement)
-					if err.msg != nil {
-						return []AbstractSyntaxTreeItem{}, err
-					}
-					add(&ASTitems, conditionalBlock)
-				}
-				if keywords.get().contents == "else" {
-					if !keywords.next() {
-						return []AbstractSyntaxTreeItem{}, codeParsingError{
-							msg:      errors.New("Unexpected end of block. Either remove the else, or add a block after the else."),
-							location: keywords.get().location,
-						}
-					}
-					blockAST, err := blockToAST(keywords)
-					if err.msg != nil {
-						return []AbstractSyntaxTreeItem{}, err
-					}
-					add(&ASTitems, AbstractSyntaxTreeItem{
-						itemType: ElseStatement,
-						contents: blockAST,
-					})
-				}
 
 			case "while":
 				conditionalBlock, err := conditionalBlockToAST(keywords, WhileLoop)
@@ -467,6 +550,9 @@ func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, code
 func functionArgumentsToAST(keywords *listIterator[keyword], argumentsHaveRegisters bool) ([]AbstractSyntaxTreeItem, codeParsingError) {
 	functionArgs := []AbstractSyntaxTreeItem{}
 	for true {
+		// Save the location of the function arg
+		argLocation := keywords.get().location
+
 		// Parse argument mutatability
 		if keywords.get().keywordType != Mutatability {
 			return []AbstractSyntaxTreeItem{}, codeParsingError{
@@ -502,8 +588,21 @@ func functionArgumentsToAST(keywords *listIterator[keyword], argumentsHaveRegist
 			}
 		}
 
+		// Add the function arg to the list of functionArgs
+		add(&functionArgs, AbstractSyntaxTreeItem{
+			itemType: FunctionArg,
+			name:     argVariableName,
+			location: argLocation,
+			contents: []AbstractSyntaxTreeItem{
+				{
+					itemType: ArgMutatability,
+					location: argLocation,
+					name:     argMutatability,
+				},
+			},
+		})
+
 		// Parse argument register if `argumentsHaveRegisters` is true
-		var argRegister string
 		if argumentsHaveRegisters {
 			if keywords.get().keywordType != Register {
 				return []AbstractSyntaxTreeItem{}, codeParsingError{
@@ -511,7 +610,11 @@ func functionArgumentsToAST(keywords *listIterator[keyword], argumentsHaveRegist
 					location: keywords.get().location,
 				}
 			}
-			argRegister = keywords.get().contents
+			add(&functionArgs[len(functionArgs)-1].contents, AbstractSyntaxTreeItem{
+				itemType: ArgRegister,
+				name:     keywords.get().contents,
+				location: keywords.get().location,
+			})
 			if !keywords.next() {
 				return []AbstractSyntaxTreeItem{}, codeParsingError{
 					msg:      errors.New("During the parsing of function args, unexpected end of the keywords slice."),
@@ -519,22 +622,6 @@ func functionArgumentsToAST(keywords *listIterator[keyword], argumentsHaveRegist
 				}
 			}
 		}
-
-		// Add the function arg to the list of functionArgs
-		add(&functionArgs, AbstractSyntaxTreeItem{
-			itemType: FunctionArg,
-			name:     argVariableName,
-			contents: []AbstractSyntaxTreeItem{
-				{
-					itemType: ArgMutatability,
-					name:     argMutatability,
-				},
-				{
-					itemType: ArgRegister,
-					name:     argRegister,
-				},
-			},
-		})
 
 		// Parse the `,`
 		if keywords.get().keywordType != ListSyntax {
@@ -554,13 +641,13 @@ func functionValueToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeIt
 	// Parse function arguments
 	if keywords.get().contents != "(" {
 		return []AbstractSyntaxTreeItem{}, codeParsingError{
-			msg:      errors.New("During the parsing of a function, after function name expecting ( as first keyword."),
+			msg:      errors.New("During the parsing of a function value, got " + keywords.get().contents + " expecting ( as first keyword."),
 			location: keywords.get().location,
 		}
 	}
 	if !keywords.next() {
 		return []AbstractSyntaxTreeItem{}, codeParsingError{
-			msg:      errors.New("During the parsing of a function, unexpected end of the keywords slice."),
+			msg:      errors.New("During the parsing of a function value, unexpected end of the keywords slice."),
 			location: keywords.get().location,
 		}
 	}
@@ -570,13 +657,13 @@ func functionValueToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeIt
 	}
 	if keywords.get().contents != ")" {
 		return []AbstractSyntaxTreeItem{}, codeParsingError{
-			msg:      errors.New("During the parsing of a function, after function arguments expecting )."),
+			msg:      errors.New("During the parsing of a function value, after function arguments expecting )."),
 			location: keywords.get().location,
 		}
 	}
 	if !keywords.next() {
 		return []AbstractSyntaxTreeItem{}, codeParsingError{
-			msg:      errors.New("During the parsing of a function, unexpected end of the keywords slice."),
+			msg:      errors.New("During the parsing of a function value, unexpected end of the keywords slice."),
 			location: keywords.get().location,
 		}
 	}
@@ -591,6 +678,7 @@ func functionValueToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeIt
 	return append(
 			[]AbstractSyntaxTreeItem{
 				{
+					location: functionArguments[0].location,
 					itemType: FunctionArgs,
 					contents: functionArguments,
 				},
@@ -621,6 +709,7 @@ func keywordsToAST(bareKeywordList []keyword) ([]AbstractSyntaxTreeItem, codePar
 					location: keywords.get().location,
 				}
 			}
+			importLocation := keywords.get().location
 			if !keywords.next() || keywords.get().keywordType != Name {
 				return []AbstractSyntaxTreeItem{}, codeParsingError{
 					msg:      errors.New("During the parsing of an import statement, unexpected end of file after `import`. Expecting keyword of type Name."),
@@ -628,15 +717,19 @@ func keywordsToAST(bareKeywordList []keyword) ([]AbstractSyntaxTreeItem, codePar
 				}
 			}
 			add(&ASTitems, AbstractSyntaxTreeItem{
+				location: importLocation,
 				itemType: ImportStatement,
 				name:     keywords.get().contents,
 			})
 		case Name:
 			canHaveImportStatements = false
 
+			// Save location
+			functionLocation := keywords.get().location
+
 			// Parse function name
 			functionName := keywords.get().contents
-			if !keywords.next() {
+			if !nextNonEmpty(&keywords) {
 				return []AbstractSyntaxTreeItem{}, codeParsingError{
 					msg:      errors.New("During the parsing of a function, unexpected end of keywords slice."),
 					location: keywords.get().location,
@@ -646,11 +739,11 @@ func keywordsToAST(bareKeywordList []keyword) ([]AbstractSyntaxTreeItem, codePar
 			// Parse ::
 			if keywords.get().contents != "::" {
 				return []AbstractSyntaxTreeItem{}, codeParsingError{
-					msg:      errors.New("During the parsing of a function, after function name expecting ::."),
+					msg:      errors.New("Unexpected `" + keywords.get().contents + "`, during the parsing of a function, after function name expecting `::`"),
 					location: keywords.get().location,
 				}
 			}
-			if !keywords.next() {
+			if !nextNonEmpty(&keywords) {
 				return []AbstractSyntaxTreeItem{}, codeParsingError{
 					msg:      errors.New("During the parsing of a function, unexpected end of the keywords slice."),
 					location: keywords.get().location,
@@ -663,6 +756,7 @@ func keywordsToAST(bareKeywordList []keyword) ([]AbstractSyntaxTreeItem, codePar
 				return []AbstractSyntaxTreeItem{}, err
 			}
 			add(&ASTitems, AbstractSyntaxTreeItem{
+				location: functionLocation,
 				itemType: FunctionDefintion,
 				name:     functionName,
 				contents: function,
