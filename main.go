@@ -31,14 +31,14 @@ func main() {
 	}
 
 	println("Compiling abstract syntax tree into assembly...")
-	dataSectionText, textSectionAssembly, error := compileAssembly(AST)
+	assembly, error := compileAssembly(AST)
 	if error.msg != nil {
 		printErrorsInCode(fileName, strings.Split(string(rawText), "\n"), []codeParsingError{error})
 		os.Exit(1)
 	}
 
 	fmt.Println("Writing assembly to out.asm...")
-	err = os.WriteFile("out.asm", []byte(".global _start\n.text"+textSectionAssembly+dataSectionText+"\n"), 0644)
+	err = os.WriteFile("out.asm", []byte(assembly), 0644)
 	if err != nil {
 		println(err.Error())
 		os.Exit(1)

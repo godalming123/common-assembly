@@ -1,17 +1,19 @@
+print :: (mut mem1 rax, mut mem2 rdi, arg text rsi, arg textLen rdx) {
+	mem1 = 1 # Write syscall
+	mem2 = 1 # Stdout file descriptor
+	syscall
+}
+
 main :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx, mut mem5 bl) {
-	mem1 = 1               # Write syscall
-	mem2 = 1               # Stdout file descriptor
 	mem3 = "Hello world\n" # The text to be written
 	mem4 = 12              # The number of charecters to be written
-	syscall
+	print mut mem1, mut mem2, arg mem3, arg mem4
 	
 	mem5 = 0
 	while 10 > mem5 {
-		mem1 = 1                  # Write syscall
-		mem2 = 1                  # Stdout file descriptor
 		mem3 = "Counting to 10\n" # The text to be written
 		mem4 = 15                 # The number of charecters to be written
-		syscall
+		print mut mem1, mut mem2, arg mem3, arg mem4
 		mem5++
 	}
 	return

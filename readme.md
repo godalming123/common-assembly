@@ -3,16 +3,24 @@
 > [!WARNING]
 > Common assembly is pre-alpha, the (probably buggy) code needs at least some refactoring, and the compiler can barely compile a hello world. Other then a compiler, there also isn't any other developer tooling such a syntax highlighting or an LSP. Here is a list of things that need doing before even a V0.1 release:
 >
-> - Suppport more compilation targets other then just linux x86-64
+> - Suppport more compilation targets other then just linux x86-64:
+>   - Rethink the register names so that they are not specefic to x86-64, and are easier to understand for people that come from higher level languages
+> - Add support for floats
 > - Use brackets to specefy order of operation in conditions
-> - Be able to call other functions (currently they can be defined but they cannot be used)
 > - A (very basic) cross-platform standard library
 > - A code highlighter
 > - Support for importing one file from another
-> - Have break and continue statements for while loops
 > - Fix the up arrow (^) that points to an error not pointing to the correct charecter when there are tabs before the charecter that it is meant to point to
 > - Fix comparisons needing to be in a certain order for the compiler to generate valid assembly
-> - A do while loop as well as the normal while loop
+> - While loops:
+>   - Have break and continue statements
+>   - A do while loop as well as the normal while loop
+> - Functions:
+>   - Stop the main function from always exiting the process when it returns as it could be called by another function, in which case it should jump to where it was called from instead
+>   - Add support for functions having `any` as a register
+>   - Add tail call optimizations
+>   - Make the `syscall` function show which registers it uses as arguments, and which registers it may modify
+> - Add actual error messages when the `assert` statements fail, rather then just a stack trace
 
 # More things to do
 
@@ -27,7 +35,8 @@ A list of some other things that need doing before a V1.0 release:
 - Lots of developer tooling:
   - Compiler:
     - Fast
-    - Clear error messages
+    - Clear error messages:
+      - A warning for unused variables
     - Suppports lots of compilation targets:
       - WASM
       - X86-64
