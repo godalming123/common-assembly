@@ -11,16 +11,15 @@
 > - A code highlighter
 > - Support for importing one file from another
 > - Fix the up arrow (^) that points to an error not pointing to the correct charecter when there are tabs before the charecter that it is meant to point to
-> - Fix comparisons needing to be in a certain order for the compiler to generate valid assembly
 > - While loops:
->   - Have break and continue statements
 >   - A do while loop as well as the normal while loop
 > - Functions:
 >   - Stop the main function from always exiting the process when it returns as it could be called by another function, in which case it should jump to where it was called from instead
 >   - Add support for functions having `any` as a register
 >   - Add tail call optimizations
 >   - Make the `syscall` function show which registers it uses as arguments, and which registers it may modify
-> - Add actual error messages when the `assert` statements fail, rather then just a stack trace
+>   - Force `mut` variables to be changed before they can be used as an argument
+> - Internal go code: Add actual error messages when the `assert` statements fail, rather then just a stack trace
 
 # More things to do
 
@@ -37,6 +36,7 @@ A list of some other things that need doing before a V1.0 release:
     - Fast
     - Clear error messages:
       - A warning for unused variables
+      - Add support for printing multiple parser or compiler errors each time the compiler is ran rathor then only printing one at a time
     - Suppports lots of compilation targets:
       - WASM
       - X86-64

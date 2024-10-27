@@ -76,6 +76,7 @@ const (
 	Mutatability                                  // mut, arg, mutArg
 	Register                                      // sys0, sys1, sys2, ...
 	StringValue                                   // "Foo", "Bar"
+	CharValue                                     // 'a', '\n'
 	BoolValue                                     // true, false
 	IntNumber                                     // 4, 23
 	FloatNumber                                   // 4.20, 6.9
@@ -83,7 +84,7 @@ const (
 	DecreaseNesting                               // ), }, ]
 	VariableCreationSyntax                        // ::
 	VariableModificationSyntax                    // =, ++, --, +=, -=, *=, /=, %=
-	ControlFlowSyntax                             // while, if, else, elif
+	ControlFlowSyntax                             // if, elif, else, while, break, continue
 	ComparisonSyntax                              // ==, !=, >, <, >=, <=, or, and
 	ListSyntax                                    // ,
 	AntiListSyntax                                // ...
@@ -97,6 +98,10 @@ const (
 	UnknownKeywordType
 )
 
+// Stores an individual keyword. When there is a list of keywords, the
+// concatenation of all of the keywords contents should be equal to the original
+// code that was lexed into the list of keywords, but without `\r`, `\t`, or
+// spaces that aren't a part of a StringValue or CharValue keyword.
 type keyword struct {
 	contents    string
 	keywordType keywordType
@@ -181,7 +186,23 @@ type parsedCode struct {
 ////////////////////////
 
 func isNotIgnoreableWhitespace(charecter byte) bool {
-	if charecter == ' ' || charecter == '\t' {
+	if charecter == ' ' || charecter == '\t' || charecter == '\r' {
+		return false
+	}
+	return true
+}
+
+func isNotNumber(charecter byte) bool {
+	if ('0' <= charecter && charecter <= '9') || charecter == '_' {
+		return false
+	}
+	return true
+}
+
+func isNotVariableCharecter(charecter byte) bool {
+	if ('a' <= charecter && charecter <= 'z') ||
+		('A' <= charecter && charecter <= 'Z') ||
+		('0' <= charecter && charecter <= '9') {
 		return false
 	}
 	return true
@@ -194,13 +215,7 @@ func isNotIgnoreableWhitespace(charecter byte) bool {
 func numberToKeyword(text *textAndPosition) (keywordType, string) {
 	// Parse any digits (and `_`) into keywordContents
 	keywordType := IntNumber
-	keywordContents := text.findUntilWithIteratedString(func(charecter byte) bool {
-		if ('0' <= charecter && charecter <= '9') || charecter == '_' {
-			return false
-		}
-		return true
-	})
-	text.findUntil(isNotIgnoreableWhitespace)
+	keywordContents := text.findUntilWithIteratedString(isNotNumber)
 
 	// Handle if the number if a float
 	if text.index < len(text.text)-1 &&
@@ -208,14 +223,8 @@ func numberToKeyword(text *textAndPosition) (keywordType, string) {
 		text.text[text.index+1] != '.' {
 		keywordType = FloatNumber
 		keywordContents += "."
-		text.index++
-		text.findUntil(isNotIgnoreableWhitespace)
-		keywordContents += text.findUntilWithIteratedString(func(charecter byte) bool {
-			if ('0' <= charecter && charecter <= '9') || charecter == '_' {
-				return false
-			}
-			return true
-		})
+		text.moveForward()
+		keywordContents += text.findUntilWithIteratedString(isNotNumber)
 	}
 
 	// Return
@@ -269,6 +278,39 @@ func lexCode(code string) parsedCode {
 			nesting -= 1
 			text.moveForward()
 
+		case '\'':
+			keywordType = CharValue
+			keywordContents = "'"
+			if text.moveForward() {
+				add(&parsingErrors, codeParsingError{
+					msg:      errors.New("Unexpected end of text while parsing charecter value"),
+					location: text.location,
+				})
+			}
+			if text.text[text.index] == '\\' {
+				keywordContents += "\\"
+				if text.moveForward() {
+					add(&parsingErrors, codeParsingError{
+						msg:      errors.New("Unexpected end of text while parsing charecter value"),
+						location: text.location,
+					})
+				}
+			}
+			keywordContents += string(text.text[text.index]) + "'"
+			if text.moveForward() {
+				add(&parsingErrors, codeParsingError{
+					msg:      errors.New("Unexpected end of text while parsing charecter value"),
+					location: text.location,
+				})
+			}
+			if text.text[text.index] != '\'' {
+				add(&parsingErrors, codeParsingError{
+					msg:      errors.New("Expected `'' to end charecter value, got `" + string(text.text[text.index]) + "`"),
+					location: text.location,
+				})
+			}
+			text.moveForward()
+
 		case '"':
 			keywordType = StringValue
 			keywordContents = "\""
@@ -283,7 +325,9 @@ func lexCode(code string) parsedCode {
 			text.moveForward()
 
 		case ',', ':', '=', '|', '<', '>', '&', '+', '-', '*', '/', '.', '%', '!', '^':
-			// Get a list of consecutively used syntax symbols
+			// Get a list of consecutively used syntax symbols. We cannot use
+			// `findUntilWithIteratedString` since that would add the ignorable
+			// whitespace to the string.
 			keywordContents = string(text.text[text.index])
 			text.moveForward()
 			text.findUntil(func(charecter byte) bool {
@@ -309,6 +353,7 @@ func lexCode(code string) parsedCode {
 				keywordType = ComparisonSyntax
 			case "^":
 				keywordType = PointerOf
+				keywordContents += text.findUntilWithIteratedString(isNotVariableCharecter)
 			case "-": // The keyword is a negative number
 				text.moveForward()
 				if text.text[text.index] < '0' || text.text[text.index] > '9' {
@@ -344,22 +389,15 @@ func lexCode(code string) parsedCode {
 			text.moveForward()
 		case 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z':
-			keywordContents = text.findUntilWithIteratedString(func(charecter byte) bool {
-				if ('a' <= charecter && charecter <= 'z') ||
-					('A' <= charecter && charecter <= 'Z') ||
-					('0' <= charecter && charecter <= '9') {
-					return false
-				}
-				return true
-			})
+			keywordContents = text.findUntilWithIteratedString(isNotVariableCharecter)
 			switch keywordContents {
-			case "if", "else", "while":
+			case "if", "elif", "else", "while", "break", "continue":
 				keywordType = ControlFlowSyntax
 			case "true", "false":
 				keywordType = BoolValue
 			case "mut", "arg", "mutArg":
 				keywordType = Mutatability
-			case "any", "rsi", "rdx", "rax", "rdi", "ecx", "rbx", "bl":
+			case "any", "rsi", "rdx", "rax", "rdi", "ecx", "rbx", "bl", "r10", "r12", "r13":
 				// TODO: Rethink the register names so that they are not specefic to x86,
 				// and are easier to understand for people that come from higher level
 				// languages.

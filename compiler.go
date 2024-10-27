@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"strings"
 )
 
 // Compiler.go
@@ -13,9 +12,9 @@ import (
 type compiledFunction struct {
 	references uint
 	jumpLabel  string
-	// If jumpLabel == "", then this will have `\` to return from this function,
-	// and maybe `/FUNCTION_NAME/` to call other functions. This code will still
-	// need to be compiled to assembly.
+	// If jumpLabel == "", then this code will have `\` to return from this
+	// function, and maybe `/FUNCTION_NAME/` to call other functions. Therefore
+	// this code might still need to be compiled to assembly.
 	assembly string
 }
 
@@ -26,14 +25,14 @@ type compilerState struct {
 	compiledFunctions          map[string]compiledFunction
 }
 
-func (jumpState *compilerState) createNewJumpLabel() string {
-	jumpState.numberOfJumps++
-	return "jumpLabel" + fmt.Sprint(jumpState.numberOfJumps)
+func (state *compilerState) createNewJumpLabel() string {
+	state.numberOfJumps++
+	return "jumpLabel" + fmt.Sprint(state.numberOfJumps)
 }
 
-func (jumpState *compilerState) createNewDataSectionLabel() string {
-	jumpState.numberOfItemsInDataSection++
-	return "dataSectionLabel" + fmt.Sprint(jumpState.numberOfItemsInDataSection)
+func (state *compilerState) createNewDataSectionLabel() string {
+	state.numberOfItemsInDataSection++
+	return "dataSectionLabel" + fmt.Sprint(state.numberOfItemsInDataSection)
 }
 
 //go:generate stringer -type=mutatability
@@ -90,16 +89,17 @@ func (state *compilerState) compileBlockToAssembly(
 		case VariableMutation:
 			assert(len(statement.contents) == 2)
 			assembly += "\n" + statement.name + " "
-			firstArg, err := state.convertValueToAssembly(parentFunctionArgs, statement.contents[0])
+			valueBeingAssignedToVariable, err := state.convertValueToAssembly(parentFunctionArgs, statement.contents[0])
 			if err.msg != nil {
 				return "", err
 			}
-			secondArg, err := state.convertValueToAssembly(parentFunctionArgs, statement.contents[1])
+			variableBeingMutated, err := state.convertValueToAssembly(parentFunctionArgs, statement.contents[1])
 			if err.msg != nil {
 				return "", err
 			}
-			assert(secondArg[0] < '0' || secondArg[1] > '9') // The first argument must be a variable
-			assembly += firstArg + ", " + secondArg
+			// The first argument must be an assembly register since you cannot mutate a constant number or string
+			assert(variableBeingMutated[0] == '%')
+			assembly += valueBeingAssignedToVariable + ", " + variableBeingMutated
 
 		case WhileLoop:
 			// Save jump labels
@@ -113,8 +113,8 @@ func (state *compilerState) compileBlockToAssembly(
 			// Add loop body
 			assembly += "\n" + loopBodyJumpLabel + ":"
 			loopBodyAssembly, err := state.compileBlockToAssembly(statement.contents[1:], parentFunctionArgs, siblingFunctions, assemblyForControlFlowKeywords{
-				breakAssembly:    "\njmp" + loopEndJumpLabel,
-				continueAssembly: "\njmp" + loopConditionJumpLabel,
+				breakAssembly:    "\njmp " + loopEndJumpLabel,
+				continueAssembly: "\njmp " + loopConditionJumpLabel,
 			})
 			if err.msg != nil {
 				return "", err
@@ -163,12 +163,31 @@ func (state *compilerState) compileBlockToAssembly(
 				assembly += "\n" + elseBlockJumpLabel + ":"
 			}
 
+		case BreakStatement:
+			if controlFlowKeywordsAssembly.breakAssembly == "" {
+				return "", codeParsingError{
+					msg:      errors.New("Break statement is not valid in this scope"),
+					location: statement.location,
+				}
+			}
+			assembly += controlFlowKeywordsAssembly.breakAssembly
+		case ContinueStatement:
+			if controlFlowKeywordsAssembly.continueAssembly == "" {
+				return "", codeParsingError{
+					msg:      errors.New("Continue statement is not valid in this scope"),
+					location: statement.location,
+				}
+			}
+			assembly += controlFlowKeywordsAssembly.continueAssembly
+
 		default:
 			return "", codeParsingError{
-				msg: errors.New("Expecting AST nodes in the body of a function to either " +
-					"be of type AssemblySyscall, MathFunctionCall, WhileLoop, IfStatement, " +
-					"got an AST node of type `" +
+				msg: errors.New("Expecting AST nodes in the body of a block to either be " +
+					"of type Return, FunctionCall, AssemblySyscall, VariableMutation, " +
+					"WhileLoop, IfStatement, BreakStatement, or ContinueStatement, got " +
+					"an AST node of type `" +
 					statement.itemType.String() + "`."),
+				location: statement.location,
 			}
 		}
 	}
@@ -408,7 +427,7 @@ func (state *compilerState) transformFunctionDefinitionIntoValidAssembly(functio
 	// Update the function jump label so that when we call
 	// `getAssemblyForFunctionCall` if it calls this function, then the early
 	// return above can return before this function calls
-	// `getAssemblyForFunctionCall` again and possibly start an infinite loop.
+	// `getAssemblyForFunctionCall` again possibly starting an infinite loop.
 	if functionName == "main" {
 		functionDefinition.jumpLabel = "_start"
 	} else {
@@ -417,18 +436,27 @@ func (state *compilerState) transformFunctionDefinitionIntoValidAssembly(functio
 	state.compiledFunctions[functionName] = functionDefinition
 
 	// Change `functionDefinition.assembly` so that it is valid assembly
-	functionDefinition.assembly = "\n" + functionDefinition.jumpLabel + ":" + strings.Replace(functionDefinition.assembly, "\\", returnAssembly, -1)
+	functionDefinition.assembly = "\n" + functionDefinition.jumpLabel + ":" + functionDefinition.assembly
+	charecterIsSingleQuoteString := false
 	for index := 0; index < len(functionDefinition.assembly); index++ {
-		if functionDefinition.assembly[index] == '/' {
-			index++
-			assert(index < len(functionDefinition.assembly))
-			functionToCall := ""
-			for functionDefinition.assembly[index] != '/' {
-				functionToCall += string(functionDefinition.assembly[index])
+		if functionDefinition.assembly[index] == '\'' {
+			charecterIsSingleQuoteString = !charecterIsSingleQuoteString
+		} else if !charecterIsSingleQuoteString {
+			if functionDefinition.assembly[index] == '/' {
+				startIndex := index
 				index++
 				assert(index < len(functionDefinition.assembly))
+				for functionDefinition.assembly[index] != '/' {
+					index++
+					assert(index < len(functionDefinition.assembly))
+				}
+				functionDefinition.assembly =
+					functionDefinition.assembly[:startIndex] +
+						state.getAssemblyForFunctionCall(functionDefinition.assembly[startIndex+1:index]) +
+						functionDefinition.assembly[index+1:]
+			} else if functionDefinition.assembly[index] == '\\' {
+				functionDefinition.assembly = functionDefinition.assembly[:index] + returnAssembly + functionDefinition.assembly[index+1:]
 			}
-			functionDefinition.assembly = strings.Replace(functionDefinition.assembly, "/"+functionToCall+"/", state.getAssemblyForFunctionCall(functionToCall), -1)
 		}
 	}
 	state.compiledFunctions[functionName] = functionDefinition
@@ -470,6 +498,11 @@ func (state *compilerState) convertValueToAssembly(parentFunctionArgs []function
 		dataSectionLabelForString := state.createNewDataSectionLabel()
 		state.dataSection += "\n" + dataSectionLabelForString + ": .ascii \"" + value.name + "\""
 		return "$" + dataSectionLabelForString, codeParsingError{}
+	case Char:
+		return "$'" + value.name + "'", codeParsingError{}
+	case PointerOfVariable:
+		assemblyRegister, err := state.getAssemblyRegisterFromVariableName(parentFunctionArgs, value.name, value.location)
+		return "(" + assemblyRegister + ")", err
 	default:
 		return "", codeParsingError{
 			location: value.location,
@@ -478,33 +511,80 @@ func (state *compilerState) convertValueToAssembly(parentFunctionArgs []function
 	}
 }
 
+// `jumpToOnTrue` and `jumpToOnFalse` can be blank strings, which means that the assembly should just continue executing if the conditions evauluates to that
 func (state *compilerState) conditionToAssembly(parentFunctionArgs []functionArg, condition AbstractSyntaxTreeItem, jumpToOnTrue string, jumpToOnFalse string) (string, codeParsingError) {
-	assert(condition.itemType == ValueComparison || condition.itemType == BooleanLogic)
 	assert(jumpToOnTrue != "" || jumpToOnFalse != "")
-	out := ""
-	switch condition.name {
-	case "and", "or":
-		for i, clause := range condition.contents {
-			var assembly string
-			var err codeParsingError
-			if i < len(condition.contents)-1 {
-				if condition.name == "and" {
-					assembly, err = state.conditionToAssembly(parentFunctionArgs, clause, "", jumpToOnFalse)
-				} else if condition.name == "or" {
-					assembly, err = state.conditionToAssembly(parentFunctionArgs, clause, jumpToOnTrue, "")
-				} else {
-					assert(false)
-				}
+	switch condition.itemType {
+	case Bool:
+		if condition.name == "true" {
+			if jumpToOnTrue == "" {
+				return "", codeParsingError{}
 			} else {
-				assembly, err = state.conditionToAssembly(parentFunctionArgs, clause, jumpToOnTrue, jumpToOnFalse)
+				return "\njmp " + jumpToOnTrue, codeParsingError{}
 			}
+		} else if condition.name == "false" {
+			if jumpToOnFalse == "" {
+				return "", codeParsingError{}
+			} else {
+				return "\njmp " + jumpToOnFalse, codeParsingError{}
+			}
+		} else {
+			panic("Unexpected internal state: Expected condition.name to equal `true`, or `false`, got `" + condition.name + "`")
+		}
+	case BooleanLogic:
+		out := ""
+		afterConditionJumpLabel := state.createNewJumpLabel()
+		jumpToOnClauseTrue := ""
+		jumpToOnClauseFalse := ""
+		if condition.name == "and" {
+			// In an and condition, if any clause is false, then the whole clause is false
+			if jumpToOnFalse != "" {
+				jumpToOnClauseFalse = jumpToOnFalse
+			} else {
+				jumpToOnClauseFalse = afterConditionJumpLabel
+			}
+		} else if condition.name == "or" {
+			// In an or condition, if any clause is true, then the whole clause is true
+			if jumpToOnTrue != "" {
+				jumpToOnClauseTrue = jumpToOnTrue
+			} else {
+				jumpToOnClauseTrue = afterConditionJumpLabel
+			}
+		} else {
+			panic("Unexpected internal state: Expected condition.name to equal `and` or `or`, got " + condition.name)
+		}
+		for i, clause := range condition.contents {
+			if i == len(condition.contents)-1 {
+				jumpToOnClauseFalse = jumpToOnFalse
+				jumpToOnClauseTrue = jumpToOnTrue
+			}
+			assembly, err := state.conditionToAssembly(parentFunctionArgs, clause, jumpToOnClauseTrue, jumpToOnClauseFalse)
 			if err.msg != nil {
 				return "", err
 			}
 			out += assembly
 		}
-	case "<", ">=", ">", "<=", "==", "!=":
+		return out + "\n" + afterConditionJumpLabel + ":", codeParsingError{}
+	case ValueComparison:
+		out := ""
 		assert(len(condition.contents) == 2)
+		if condition.contents[1].itemType != VarName && condition.contents[1].itemType != PointerOfVariable {
+			// In AT&T assembly syntax, the second operator for the cmp instruction must
+			// either be a register or a memory operand, so we need need to flip the
+			// operators, and the greater then sign.
+			if condition.contents[0].itemType != VarName && condition.contents[0].itemType != PointerOfVariable {
+				return "", codeParsingError{
+					msg:      errors.New("Comparisons must have at least 1 variable name or pointer to memory in them"),
+					location: condition.location,
+				}
+			}
+			condition.contents = []AbstractSyntaxTreeItem{condition.contents[1], condition.contents[0]}
+			if condition.name[0] == '<' {
+				condition.name = ">" + condition.name[1:]
+			} else if condition.name[0] == '>' {
+				condition.name = "<" + condition.name[1:]
+			}
+		}
 		firstArg, err := state.convertValueToAssembly(parentFunctionArgs, condition.contents[0])
 		if err.msg != nil {
 			return "", err
@@ -535,6 +615,8 @@ func (state *compilerState) conditionToAssembly(parentFunctionArgs []functionArg
 		case "!=":
 			jumpOnTrueCmp = "jne"
 			jumpOnFalseCmp = "je"
+		default:
+			panic("Unexpected internal state: Expected AST item of type ValueComparison to have name either >, >=, <, <=, ==, or !=, got " + condition.name)
 		}
 
 		if jumpToOnTrue != "" {
@@ -545,8 +627,8 @@ func (state *compilerState) conditionToAssembly(parentFunctionArgs []functionArg
 		} else if jumpToOnFalse != "" {
 			out += "\n" + jumpOnFalseCmp + " " + jumpToOnFalse
 		}
+		return out, codeParsingError{}
 	default:
-		assert(false)
+		panic("Unexpected internal state: Expected condition.itemType to equal Bool, BooleanLogic, or ValueComparison, got " + condition.itemType.String())
 	}
-	return out, codeParsingError{}
 }

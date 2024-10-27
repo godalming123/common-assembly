@@ -24,6 +24,8 @@ const (
 	Undefined possibleAbstractSyntaxTreeItem = iota
 	ImportStatement
 	WhileLoop
+	BreakStatement
+	ContinueStatement
 	IfStatement
 	ElseStatement
 	FunctionDefintion
@@ -41,9 +43,11 @@ const (
 
 	PointerOfVariable
 	String
+	Char
 	Int
 	Float
 	VarName
+	Bool
 )
 
 type AbstractSyntaxTreeItem struct {
@@ -87,6 +91,22 @@ func conditionToAST(keywords []keyword) (AbstractSyntaxTreeItem, codeParsingErro
 		return conditionClausesToAST(orClauses, "or")
 	}
 
+	// Handle if there is only 1 keyword
+	if len(keywords) == 1 {
+		if keywords[0].keywordType != BoolValue {
+			return AbstractSyntaxTreeItem{}, codeParsingError{
+				msg:      errors.New("Expect conditions that only have one keyword to be of type BoolValue, got a keyword of type `" + keywords[0].keywordType.String() + "`"),
+				location: keywords[0].location,
+			}
+		}
+		assert(keywords[0].contents == "true" || keywords[0].contents == "false")
+		return AbstractSyntaxTreeItem{
+			name:     keywords[0].contents,
+			itemType: Bool,
+			location: keywords[0].location,
+		}, codeParsingError{}
+	}
+
 	// Handle comparisons without `and` or `or` in them
 	return comparisonToAST(keywords)
 }
@@ -104,9 +124,17 @@ func parseValue(keyword keyword) (AbstractSyntaxTreeItem, codeParsingError) {
 		ASTitemType = String
 		assert(keyword.contents[0] == '"' && keyword.contents[len(keyword.contents)-1] == '"')
 		keyword.contents = keyword.contents[1 : len(keyword.contents)-1]
+	case CharValue:
+		ASTitemType = Char
+		assert(keyword.contents[0] == '\'' && keyword.contents[len(keyword.contents)-1] == '\'')
+		keyword.contents = keyword.contents[1 : len(keyword.contents)-1]
+	case PointerOf:
+		ASTitemType = PointerOfVariable
+		assert(keyword.contents[0] == '^')
+		keyword.contents = keyword.contents[1:]
 	default:
 		return AbstractSyntaxTreeItem{}, codeParsingError{
-			msg:      errors.New("While parsing value, unexpected keyword type " + keyword.keywordType.String() + " expecting a keyword of type Name, IntNumber, FloatNumber, or StringValue"),
+			msg:      errors.New("While parsing value, unexpected keyword type " + keyword.keywordType.String() + " expecting a keyword of type Name, IntNumber, FloatNumber, StringValue, CharValue, or PointerOf"),
 			location: keyword.location,
 		}
 	}
@@ -157,7 +185,7 @@ func comparisonToAST(keywordList []keyword) (AbstractSyntaxTreeItem, codeParsing
 				return comparisonClauses[0], codeParsingError{}
 			} else {
 				return AbstractSyntaxTreeItem{
-					itemType: ValueComparison,
+					itemType: BooleanLogic,
 					name:     "and",
 					contents: comparisonClauses,
 					location: keywordList[0].location,
@@ -323,6 +351,7 @@ func ifStatementToAST(keywords *listIterator[keyword]) (AbstractSyntaxTreeItem, 
 	return out, codeParsingError{}
 }
 
+// After a succsesful execution of this function, keywords.get().contents should equal to "}"
 func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, codeParsingError) {
 	// Parse {
 	if keywords.get().contents != "{" {
@@ -405,27 +434,16 @@ func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, code
 					}
 					// TODO: Maybe we should support defining a variable as the result of a comparison
 					if keywords.get().keywordType == PointerOf {
-						if !keywords.next() {
-							return []AbstractSyntaxTreeItem{}, codeParsingError{
-								location: keywords.get().location,
-								msg:      errors.New("Unexpected end of keywords"),
-							}
-						}
-						if keywords.get().keywordType != Name {
-							return []AbstractSyntaxTreeItem{}, codeParsingError{
-								location: keywords.get().location,
-								msg:      errors.New("During parsing of variable mutation, after ^, a keyword of type name, got a keyword of type " + keywords.get().keywordType.String() + "."),
-							}
-						}
 						if functionCall != "mov" {
 							return []AbstractSyntaxTreeItem{}, codeParsingError{
 								location: keywords.get().location,
 								msg:      errors.New("During parsing of variable mutation, ^ can only be used with ="),
 							}
 						}
+						assert(keywords.get().contents[0] == '^')
 						functionCall = "movq"
 						functionValue1.itemType = VarName
-						functionValue1.name = keywords.get().contents
+						functionValue1.name = keywords.get().contents[1:]
 					} else {
 						var err codeParsingError
 						functionValue1, err = parseValue(*keywords.get())
@@ -509,14 +527,20 @@ func blockToAST(keywords *listIterator[keyword]) ([]AbstractSyntaxTreeItem, code
 				}
 				add(&ASTitems, conditionalBlock)
 
-			case "else":
+			case "break":
+				add(&ASTitems, AbstractSyntaxTreeItem{location: keywords.get().location, itemType: BreakStatement})
+
+			case "continue":
+				add(&ASTitems, AbstractSyntaxTreeItem{location: keywords.get().location, itemType: ContinueStatement})
+
+			case "else", "elif":
 				return []AbstractSyntaxTreeItem{}, codeParsingError{
-					msg:      errors.New("Unexpected `else` statement. Else statements must go directly after the end of a if/elif block."),
+					msg:      errors.New("Unexpected " + keywords.get().contents + " statement. Else/elif statements must go directly after the end of an if/elif block."),
 					location: keywords.get().location,
 				}
 
 			default:
-				panic("Unexpected internal state: `stringToKeywords.go` should not produce a keyword of type ControlFlowSyntax that has contents othen then if, else, or while.")
+				panic("Unexpected internal state: Got a keyword of type ControlFlowSyntax with contents `" + keywords.get().contents + "` expected a keyword of this type to have contents `if`, `elif`, `else`, `while`, `break`, or `continue`.")
 			}
 
 		// The only valid statement that starts with decrease nesting is }, which exits the block scope

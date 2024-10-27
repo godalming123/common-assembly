@@ -4,19 +4,80 @@ print :: (mut mem1 rax, mut mem2 rdi, arg text rsi, arg textLen rdx) {
 	syscall
 }
 
-main :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx, mut mem5 bl) {
-	mem3 = "Hello world\n" # The text to be written
-	mem4 = 12              # The number of charecters to be written
+main :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx, mut mem5 r12, mut mem6 r13) {
+	mem3 = "Enter your name: " # The text to be written
+	mem4 = 17                  # The number of charecters to be written
+	print mut mem1, mut mem2, arg mem3, arg mem4
+
+	# Get the address of the program break
+	mem1 = 12
+	mem2 = 0
+	syscall
+
+	# Set `mem5` and `mem6` to keep track of the buffer used to input text
+	mem6 = mem1 # mem6 == buffer start
+	mem5 = mem1 # mem5 == buffer current position
+	
+	# Loop to take user input
+	while true {
+		# Get the address of the program break
+		mem1 = 12
+		mem2 = 0
+		syscall
+
+		# Expand the heap if necersarry
+		if mem5 >= mem1 {
+			mem2 = mem1
+			mem2 += 1024
+			mem1 = 12
+			syscall
+		}
+
+		# Read a charecter from stdin
+		mem1 = 0
+		mem2 = 0
+		mem3 = mem5
+		mem4 = 1
+		syscall
+
+		if mem1 < 0 {
+			# The syscall failed
+			mem2 = mem1
+			mem1 = 60
+			syscall
+		} elif mem1 == 0 {
+			# Enf of file received
+			break
+		} elif ^mem5 == '\n' {
+			break
+		}
+		mem5 += 8
+	}
+
+	# Print a label for the text that the user entered
+	mem3 = "You entered: "
+	mem4 = 13
+	print mut mem1, mut mem2, arg mem3, arg mem4
+
+	# Print the text that the user entered
+	mem3 = mem6
+	mem4 = mem5
+	mem4 -= mem6
+	print mut mem1, mut mem2, arg mem3, arg mem4
+
+	# Print a newline
+	mem3 = "\n"
+	mem4 = 1
 	print mut mem1, mut mem2, arg mem3, arg mem4
 	
+	# Print `Counting to 10...\n` 10 times
+	mem3 = "Counting to 10...\n"
+	mem4 = 18
 	mem5 = 0
-	while 10 > mem5 {
-		mem3 = "Counting to 10\n" # The text to be written
-		mem4 = 15                 # The number of charecters to be written
+	while mem5 < 10 {
 		print mut mem1, mut mem2, arg mem3, arg mem4
 		mem5++
 	}
-	return
 }
 
 pointIsOnScreen :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx, arg alwaysReturnTrue any, arg false1InsteadOf2 any, arg screenWidth any, arg screenHeight any, arg pointX any, arg pointY any) {
@@ -61,7 +122,7 @@ pow :: (mut x any, mutArg y any) {
 	# 	x *= x
 	# } while decAndContinueIfNotZero mutArg y
 
-	# The code above compiles to the following x86-64 assembly:
+	# The code above would compile to the following x86-64 assembly:
 	# cmp ecx, 1
 	# jle end ; If ecx <= 0, jump to end
 	# dec ecx
