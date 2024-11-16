@@ -40,7 +40,7 @@ func printErrorsInCode(fileName string, fileLines []string, errors []codeParsing
 		return false
 	}
 	println(ansiBold, "===============", len(errors), "errors encountered in", fileName, "===============", ansiReset)
-	charectersNeededForLineNumber := len(fmt.Sprint(len(fileLines)))
+	charectersNeededForLineNumber := len(fmt.Sprint(errors[len(errors)-1].location.line))
 	currentErrorIndex := 0
 	shouldContinue := true
 	for shouldContinue {
@@ -58,14 +58,17 @@ func printErrorsInCode(fileName string, fileLines []string, errors []codeParsing
 			// For each error on the current line, print the error
 			for errors[currentErrorIndex].location.line == lineNumber+1 {
 				groupEnd = min(len(fileLines), errors[currentErrorIndex].location.line+5)
-				println(
-					// TODO: This code assumes that ever charecter takes up 1 column, which
-					// means that the arrow is not in the right place for lines with tabs in
-					// them
-					strings.Repeat(" ", charectersNeededForLineNumber+errors[currentErrorIndex].location.column),
-					"^"+ansiBold,
-					errors[currentErrorIndex].msg.Error()+ansiReset,
-				)
+				print(strings.Repeat(" ", charectersNeededForLineNumber+2))
+				for index, char := range fileLines[lineNumber] {
+					if index >= errors[currentErrorIndex].location.column-1 {
+						break
+					} else if char == '\t' {
+						print("\t")
+					} else {
+						print(" ")
+					}
+				}
+				println("^ " + ansiBold + errors[currentErrorIndex].msg.Error() + ansiReset)
 				if currentErrorIndex >= len(errors)-1 {
 					shouldContinue = false
 					break

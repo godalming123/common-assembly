@@ -37,6 +37,7 @@ A list of some other things that need doing before a V1.0 release:
     - Clear error messages:
       - A warning for unused variables
       - Add support for printing multiple parser or compiler errors each time the compiler is ran rathor then only printing one at a time
+      - Instead of just pointing to the first charecter of a keyword, the errors could point to the whole keyword
     - Suppports lots of compilation targets:
       - WASM
       - X86-64
@@ -99,3 +100,4 @@ A list of performance improvements compared to low level languages such as C/C++
 # Code style for the go code in this repo
 
 - If you have more than 4 levels of indentation, then you need to refactor your code
+- Lines cannot be longer than 100 charecters
