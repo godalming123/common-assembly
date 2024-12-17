@@ -1,125 +1,103 @@
-print :: (mut mem1 rax, mut mem2 rdi, arg text rsi, arg textLen rdx) {
-	mem1 = 1 # Write syscall
-	mem2 = 1 # Stdout file descriptor
-	syscall
-}
+fn r0, r1, r2, r3, r4, r5, r8, r12, r13 = main() {
+	# When calling a function, if you name a register for the function arg, then you have to update
+	# the value of the register, and if you use a variable, then you should update it's value on the
+	# line before. This forces you to use registers as temporary data stores that are only used to call
+	# one function, and variables as slightly more permanent data stores.
 
-main :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx, mut mem5 r12, mut mem6 r13) {
-	mem3 = "Enter your name: " # The text to be written
-	mem4 = 17                  # The number of charecters to be written
-	print mut mem1, mut mem2, arg mem3, arg mem4
+	# TODO: Stop assuming that the page size is 4096 bits in this program
 
-	# Get the address of the program break
-	mem1 = 12
-	mem2 = 0
-	syscall
+	# Print "Enter you name: \n"
+	r0 = sysWrite(r5=1, r4="Enter your name: ", r3=17) # Here, instead of nothing after `r0`, you could use a name to reserve that register for a variable of that name
 
-	# Set `mem5` and `mem6` to keep track of the buffer used to input text
-	mem6 = mem1 # mem6 == buffer start
-	mem5 = mem1 # mem5 == buffer current position
-	
-	# Loop to take user input
+	# Setup variables to keep track of the program break
+	r0 progBreak = sysBrk(r5=0)
+	r13 originalBreak = progBreak
+	r12 bufferCurrentPos = progBreak
+	r8 currentBreak = drop progBreak # Drop means that we no longer use the break variable, and it can now be used as a normal register
+
+	# Loop to store user input in `originalBreak`, and increase the program break as necersarry
 	while true {
-		# Get the address of the program break
-		mem1 = 12
-		mem2 = 0
-		syscall
-
-		# Expand the heap if necersarry
-		if mem5 >= mem1 {
-			mem2 = mem1
-			mem2 += 1024
-			mem1 = 12
-			syscall
+		if bufferCurrentPos >= currentBreak {
+			currentBreak += 4096
+			r0 = sysBrk(r5=currentBreak)
 		}
-
-		# Read a charecter from stdin
-		mem1 = 0
-		mem2 = 0
-		mem3 = mem5
-		mem4 = 1
-		syscall
-
-		if mem1 < 0 {
-			# The syscall failed
-			mem2 = mem1
-			mem1 = 60
-			syscall
-		} elif mem1 == 0 {
-			# Enf of file received
-			break
-		} elif ^mem5 == '\n' {
+		r0 returnCode = sysRead(r5=0, r4=bufferCurrentPos, r3=1)
+		if returnCode < 0 {
+			# After a register has been reserved for a variable, the only way to access the register is with just the variable name without naming the register
+			returnCode = sysExit(r5=returnCode)
+		} elif returnCode == 0 or ^bufferCurrentPos == '\n' {
 			break
 		}
-		mem5 += 8
+		bufferCurrentPos += 8
 	}
 
-	# Print a label for the text that the user entered
-	mem3 = "You entered: "
-	mem4 = 13
-	print mut mem1, mut mem2, arg mem3, arg mem4
+	# Print the text the user entered
+	r0 = sysWrite(r5=1, r4="You entered: ", r3=13)
+	r3 inputLen = drop bufferCurrentPos
+	inputLen -= originalBreak
+	# TODO: Fix /= and *=
+	# inputLen /= 8
+	r0 = sysWrite(r5=1, r4=originalBreak, drop inputLen)
 
-	# Print the text that the user entered
-	mem3 = mem6
-	mem4 = mem5
-	mem4 -= mem6
-	print mut mem1, mut mem2, arg mem3, arg mem4
+	# Free all of the text that the user entered, except 1 page which will be used to store a counter
+	r5 newBreak = originalBreak
+	newBreak += 4096
+	r0 = sysBrk(drop newBreak)
 
-	# Print a newline
-	mem3 = "\n"
-	mem4 = 1
-	print mut mem1, mut mem2, arg mem3, arg mem4
-	
-	# Print `Counting to 10...\n` 10 times
-	mem3 = "Counting to 10...\n"
-	mem4 = 18
-	mem5 = 0
-	while mem5 < 10 {
-		print mut mem1, mut mem2, arg mem3, arg mem4
-		mem5++
+	# Print `Counting from 0 to 9...\n`
+	r0 = sysWrite(r5=1, r4="\nCounting from 0 to 9...\n", r3=25)
+
+	# Print the numbers 0 through 9
+	r4 charToPrint = originalBreak
+	^charToPrint = '0'
+	while true {
+		r0 = sysWrite(r5=1, charToPrint, r3=1)
+		^charToPrint++
+		charToPrint = "\n"
+		r0 = sysWrite(r5=1, charToPrint, r3=1)
+		charToPrint = originalBreak
+		if ^charToPrint > '9' {
+			break
+		}
 	}
-}
+	drop charToPrint
 
-pointIsOnScreen :: (mut mem1 rax, mut mem2 rdi, mut mem3 rsi, mut mem4 rdx, arg alwaysReturnTrue any, arg false1InsteadOf2 any, arg screenWidth any, arg screenHeight any, arg pointX any, arg pointY any) {
-	# This is just to test the compilation of complex conditions
-	# TODO: Add () to the order of operations for expressions so alwaysReturnTrue
-	# is only referenced once
-	if 0 <= pointX < screenWidth or alwaysReturnTrue != 0
-    	and 0 <= pointY < screenHeight or alwaysReturnTrue != 0 {
-		mem3 = "TRUE"
-		mem4 = 4
-		print arg mem3, arg mem4, mut mem1, mut mem2
-	} elif false1InsteadOf2 != 0 {
-		mem3 = "FALSE1"
-		mem4 = 6
-		print arg mem3, arg mem4, mut mem1, mut mem2
+	# Check if a point is on the screen
+	r0 onScreen = pointIsOnScreen(r0=300, r1=30, r2=100, r3=250, r4=0)
+	if drop onScreen == 0 {
+		r0 = sysWrite(r5=1, r4="Point is not on the screen\n", r3=27)
 	} else {
-		mem3 = "FALSE2"
-		mem4 = 6
-		print arg mem3, arg mem4, mut mem1, mut mem2
-	}
-	if pointX == pointY {
-		mem3 = "The x is the same as the y"
-		mem4 = 26
-		print arg mem3, arg mem4, mut mem1, mut mem2
+		r0 = sysWrite(r5=1, r4="Point is on the screen\n", r3=23)
 	}
 }
 
-# Calculates x^y. `x` is set to the result, and `y` is set to min(y, 1). Here
-# x and y could occupy any register since the code does not specify.
-pow :: (mut x any, mutArg y any) {
-	while y > 1 {
-		x *= x
-		y--
+fn r0 onScreen = pointIsOnScreen (r0=pointX, r1=pointY, r2=screenWidth, r3=screenHeight, r4=alwaysReturnTrue) {
+	# This is just to test the compilation of complex conditions
+	if alwaysReturnTrue != 0 or (0 <= pointX < screenWidth and 0 <= pointY < screenHeight) {
+		return r0=1
+	} else {
+		return r0=0
 	}
+}
+
+# Calculates base^power. `base` is set to the result, and `power` is set to `min(index, 1)`
+fn r0 result, r1 = pow (r0=base, r1=power) {
+	# In code where a register is used as an argument, and a mutator, you refer to
+	# the register as the name given to the argument, but you can also `drop` that
+	# name to use it as a normal register.
+	while power > 1 {
+		base *= base
+		power--
+	}
+	return r0=base
 	# TODO: Support this updated code that uses the `loop` insruction in x86
 	# assembly to be faster
-	# if y <= 1 {
+	# if power <= 1 {
 	# 	return
 	# }
-	# y--
+	# power--
 	# do {
-	# 	x *= x
+	# 	base *= base
 	# } while decAndContinueIfNotZero mutArg y
 
 	# The code above would compile to the following x86-64 assembly:

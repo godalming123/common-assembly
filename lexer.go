@@ -68,43 +68,13 @@ func (text *textAndPosition) findUntilWithIteratedString(checker func(byte) bool
 // KEYWORD TYPE //
 //////////////////
 
-//go:generate stringer -type=keywordType
-type keywordType uint8
-
-const (
-	Name                       keywordType = iota // myVariableName3, _
-	Mutatability                                  // mut, arg, mutArg
-	Register                                      // sys0, sys1, sys2, ...
-	StringValue                                   // "Foo", "Bar"
-	CharValue                                     // 'a', '\n'
-	BoolValue                                     // true, false
-	IntNumber                                     // 4, 23
-	FloatNumber                                   // 4.20, 6.9
-	IncreaseNesting                               // (, {, [
-	DecreaseNesting                               // ), }, ]
-	VariableCreationSyntax                        // ::
-	VariableModificationSyntax                    // =, ++, --, +=, -=, *=, /=, %=
-	ControlFlowSyntax                             // if, elif, else, while, break, continue
-	ComparisonSyntax                              // ==, !=, >, <, >=, <=, or, and
-	ListSyntax                                    // ,
-	AntiListSyntax                                // ...
-	IterationSyntax                               // ..
-	Syscall                                       // syscall
-	Import                                        // import
-	FunctionReturn                                // return
-	PointerOf                                     // ^
-	Comment                                       // # My comment 2
-	Newline                                       // \n
-	UnknownKeywordType
-)
-
 // Stores an individual keyword. When there is a list of keywords, the
 // concatenation of all of the keywords contents should be equal to the original
 // code that was lexed into the list of keywords, but without `\r`, `\t`, or
 // spaces that aren't a part of a StringValue or CharValue keyword.
 type keyword struct {
 	contents    string
-	keywordType keywordType
+	keywordType typeOfParsedKeywordOrASTitem
 	nesting     uint8
 	location    textLocation
 }
@@ -116,21 +86,23 @@ func printKeywords(keywords []keyword) {
 	longestNesting := 7
 	longestType := 12
 	longestContents := 16
-	for _, keyword := range keywords {
-		if len(fmt.Sprint(keyword.location.line)) > longestLine {
-			longestLine = len(fmt.Sprint(keyword.location.line))
+	for i := range keywords {
+		keywords[i].contents = strings.Replace(keywords[i].contents, "\n", "\\n", -1)
+		keywords[i].contents = strings.Replace(keywords[i].contents, "\t", "    ", -1)
+		if len(fmt.Sprint(keywords[i].location.line)) > longestLine {
+			longestLine = len(fmt.Sprint(keywords[i].location.line))
 		}
-		if len(fmt.Sprint(keyword.location.column)) > longestColumn {
-			longestColumn = len(fmt.Sprint(keyword.location.column))
+		if len(fmt.Sprint(keywords[i].location.column)) > longestColumn {
+			longestColumn = len(fmt.Sprint(keywords[i].location.column))
 		}
-		if len(fmt.Sprint(int(keyword.nesting))) > longestNesting {
-			longestNesting = len(fmt.Sprint(keyword.nesting))
+		if len(fmt.Sprint(int(keywords[i].nesting))) > longestNesting {
+			longestNesting = len(fmt.Sprint(keywords[i].nesting))
 		}
-		if len(keyword.keywordType.String()) > longestType {
-			longestType = len(keyword.keywordType.String())
+		if len(keywords[i].keywordType.String()) > longestType {
+			longestType = len(keywords[i].keywordType.String())
 		}
-		if len(strings.Replace(keyword.contents, "\n", "\\n", -1)) > longestContents {
-			longestContents = len(strings.Replace(keyword.contents, "\n", "\\n", -1))
+		if len(keywords[i].contents) > longestContents {
+			longestContents = len(strings.Replace(keywords[i].contents, "\n", "\\n", -1))
 		}
 	}
 	printTableSymbolsRow(
@@ -154,7 +126,7 @@ func printKeywords(keywords []keyword) {
 			{contents: fmt.Sprint(keyword.location.column), width: longestColumn, rightAligned: true},
 			{contents: fmt.Sprint(keyword.nesting), width: longestNesting, rightAligned: true},
 			{contents: keyword.keywordType.String(), width: longestType},
-			{contents: strings.Replace(keyword.contents, "\n", "\\n", -1), width: longestContents},
+			{contents: keyword.contents, width: longestContents},
 		})
 	}
 	printTableSymbolsRow(
@@ -170,15 +142,6 @@ func printKeywords(keywords []keyword) {
 type codeParsingError struct {
 	msg      error
 	location textLocation
-}
-
-//////////////////////
-// PARSED CODE TYPE //
-//////////////////////
-
-type parsedCode struct {
-	keywords      []keyword
-	parsingErrors []codeParsingError
 }
 
 ////////////////////////
@@ -202,7 +165,8 @@ func isNotNumber(charecter byte) bool {
 func isNotVariableCharecter(charecter byte) bool {
 	if ('a' <= charecter && charecter <= 'z') ||
 		('A' <= charecter && charecter <= 'Z') ||
-		('0' <= charecter && charecter <= '9') {
+		('0' <= charecter && charecter <= '9') ||
+		charecter == '_' {
 		return false
 	}
 	return true
@@ -212,7 +176,7 @@ func isNotVariableCharecter(charecter byte) bool {
 // MAIN CODE //
 ///////////////
 
-func numberToKeyword(text *textAndPosition) (keywordType, string) {
+func numberToKeyword(text *textAndPosition) (typeOfParsedKeywordOrASTitem, string) {
 	// Parse any digits (and `_`) into keywordContents
 	keywordType := IntNumber
 	keywordContents := text.findUntilWithIteratedString(isNotNumber)
@@ -231,7 +195,7 @@ func numberToKeyword(text *textAndPosition) (keywordType, string) {
 	return keywordType, keywordContents
 }
 
-func lexCode(code string) parsedCode {
+func lexCode(code string) ([]keyword, []codeParsingError) {
 	text := textAndPosition{
 		text:  code,
 		index: 0,
@@ -245,7 +209,7 @@ func lexCode(code string) parsedCode {
 	var nesting uint8
 
 	for text.findUntil(isNotIgnoreableWhitespace) {
-		keywordType := UnknownKeywordType
+		keywordType := Unknown
 		keywordContents := ""
 		keywordPosition := text.location
 
@@ -254,10 +218,7 @@ func lexCode(code string) parsedCode {
 			keywordType = Newline
 			keywordContents = "\n"
 			if text.moveForward() {
-				return parsedCode{
-					keywords:      keywords,
-					parsingErrors: parsingErrors,
-				}
+				return keywords, parsingErrors
 			}
 		case '#':
 			keywordType = Comment
@@ -345,15 +306,24 @@ func lexCode(code string) parsedCode {
 			// Depending on what syntax symbols were consecutively used, add a keyword or
 			// create an error message.
 			switch keywordContents {
-			case "::":
-				keywordType = VariableCreationSyntax
-			case "=", "++", "--", "+=", "-=", "*=", "/=", "%=":
-				keywordType = VariableModificationSyntax
+			case "=":
+				keywordType = Assignment
+			case "++":
+				keywordType = Increment
+			case "--":
+				keywordType = Decrement
+			case "+=":
+				keywordType = PlusEquals
+			case "-=":
+				keywordType = MinusEquals
+			case "*=":
+				keywordType = MultiplyEquals
+			case "/=":
+				keywordType = DivideEquals
 			case "==", "!=", "<=", ">=", "<", ">":
 				keywordType = ComparisonSyntax
 			case "^":
-				keywordType = PointerOf
-				keywordContents += text.findUntilWithIteratedString(isNotVariableCharecter)
+				keywordType = Dereference
 			case "-": // The keyword is a negative number
 				text.moveForward()
 				if text.text[text.index] < '0' || text.text[text.index] > '9' {
@@ -367,10 +337,6 @@ func lexCode(code string) parsedCode {
 				keywordContents = "-" + keywordContents
 			case ",":
 				keywordType = ListSyntax
-			case "...":
-				keywordType = AntiListSyntax
-			case "..":
-				keywordType = IterationSyntax
 			default:
 				add(&parsingErrors, codeParsingError{
 					msg: errors.New(
@@ -383,33 +349,39 @@ func lexCode(code string) parsedCode {
 				continue
 			}
 
-		case '_':
-			keywordType = Name
-			keywordContents = "_"
-			text.moveForward()
-		case 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+		case '_', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z':
 			keywordContents = text.findUntilWithIteratedString(isNotVariableCharecter)
 			switch keywordContents {
-			case "if", "elif", "else", "while", "break", "continue":
-				keywordType = ControlFlowSyntax
+			case "fn":
+				keywordType = Function
+			case "drop":
+				keywordType = DropVariable
+			case "if":
+				keywordType = IfStatement
+			case "elif":
+				keywordType = ElifStatement
+			case "else":
+				keywordType = ElseStatement
+			case "while":
+				keywordType = WhileLoop
+			case "break":
+				keywordType = BreakStatement
+			case "continue":
+				keywordType = ContinueStatement
 			case "true", "false":
 				keywordType = BoolValue
-			case "mut", "arg", "mutArg":
-				keywordType = Mutatability
-			case "any", "rsi", "rdx", "rax", "rdi", "ecx", "rbx", "bl", "r10", "r12", "r13":
-				// TODO: Rethink the register names so that they are not specefic to x86,
-				// and are easier to understand for people that come from higher level
-				// languages.
+			case "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
+				"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15":
 				keywordType = Register
-			case "syscall":
-				keywordType = Syscall
 			case "return":
 				keywordType = FunctionReturn
 			case "import":
 				keywordType = Import
-			case "and", "or":
-				keywordType = ComparisonSyntax
+			case "and":
+				keywordType = And
+			case "or":
+				keywordType = Or
 			default:
 				keywordType = Name
 				text.findUntil(isNotIgnoreableWhitespace)
@@ -440,7 +412,7 @@ func lexCode(code string) parsedCode {
 			continue
 		}
 
-		assert(keywordType != UnknownKeywordType)
+		assert(notEq(keywordType, Unknown))
 		add(&keywords, keyword{
 			keywordType: keywordType,
 			contents:    keywordContents,
@@ -456,8 +428,5 @@ func lexCode(code string) parsedCode {
 		}
 	}
 
-	return parsedCode{
-		keywords:      keywords,
-		parsingErrors: parsingErrors,
-	}
+	return keywords, parsingErrors
 }
