@@ -78,6 +78,33 @@ A list of some other things that need doing before a V1.0 release:
     - Refactor code into a seperate function
   - A way to generate docs based on code comments
 
+# Installation instructions for Windows
+
+1. Install Ubuntu WSL with [this guide](https://learn.microsoft.com/en-us/windows/wsl/install). From this point onwards, every command should be ran in WSL.
+2. Install go:
+   ```sh
+   sudo apt-get install golang
+   ```
+3. Clone the common assembly code:
+   ```sh
+   git clone https://github.com/godalming123/common-assembly.git
+   cd common-assembly
+   ```
+4. Compile the go code:
+   ```sh
+   go generate
+   go compile
+   ```
+5. Put your common assembly code in `./main.ca`
+6. Compile the common assembly in `./main.ca`:
+   ```sh
+   ./main
+   ```
+7. Run the binary produced by the common assembly compiler:
+   ```sh
+   ./out
+   ```
+
 # Performance
 
 A list of ways to benchmark common assembly compared to other languages:
@@ -115,3 +142,7 @@ A list of performance improvements compared to low level languages such as C/C++
 
 - If you have more than 4 levels of indentation, then you need to refactor your code
 - Lines cannot be longer than 100 charecters
+
+# Stargazers over time
+
+[![Stargazers over time](https://starchart.cc/godalming123/common-assembly.svg)](https://starchart.cc/godalming123/common-assembly)

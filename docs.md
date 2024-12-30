@@ -1,5 +1,11 @@
-> [!WARNING]
-> The compiler still needs updating in order to compile some of the examples here.
+> [!NOTE]
+> Some of the examples in these docs use the `print` function, which is defined like so:
+>
+> ```
+> r0 exitCode, r5 = print(r4=textToPrint, r3=numberOfCharecters) {
+>   return r0=sysWrite(r5=1, textToPrint, numberOfCharecters)
+> }
+> ```
 
 # 1. Registers
 
@@ -31,6 +37,10 @@ When the registers are named individually, it means that they are only being use
 r0, r5 = print(r4="Text to print\n", r3=14)
 ```
 
+> [!NOTE]
+> **Only applies once common assembly can compile to several different architectures:**
+> Different architectures have different numbers of registers. This means that on architectures with less registers, the later registers are actually just pointers to values stored in the data section, meaning that they are much slower than normal registers.
+
 # 2. Variables
 
 If you want to save the value in a register for more then one function call, then you have to reserve the register with a specefic variable. To do this, add the variable name next to a place in the code where the register is mutated:
@@ -46,7 +56,7 @@ Registers that are reserved for use with a specefic variable are used by naming 
 
 ```
 r0 returnCode, r5 = print(r4="Testing variables\n", r3=18)
-r0 = exit(r5=returnCode)
+r0 = sysExit(r5=returnCode)
 # This code is invalid since r0 is reserved for the `returnCode` variable, so r0 cannot be mutated by naming the register since that would implicitly change the `returnCode` variable
 ```
 
@@ -54,8 +64,8 @@ To get round this, the `drop` keyword is used at the last place where a variable
 
 ```diff
 r0 returnCode, r5 = print(r4="Testing variables\n", r3=18)
--r0 = exit(r5=returnCode)
-+r0 = exit(r5=drop returnCode)
+-r0 = sysExit(r5=returnCode)
++r0 = sysExit(r5=drop returnCode)
 # Now the r0 register can be used just by naming the register, and `returnCode` is no longer a variable
 ```
 
@@ -78,9 +88,9 @@ Comparisons consist of `==`, `!=`, `>=`, `>`, `<=`, or `<` in between 2 values. 
 ```
 fn r0 greaterThan0 = isGreaterThan0(r0=number) {
   if number > 0 {
-    return 1
+    return r0=1
   }
-  return 0
+  return r0=0
 }
 ```
 
@@ -89,9 +99,9 @@ Comparisons with arrows can be chained as long as the arrows point in the same d
 ```
 fn r0 valid = listRangeIsValid(r0=listLen, r1=listRangeStart, r2=listRangeEnd) {
   if 0 <= listRangeStart <= listRangeEnd < listLen {
-    return 1
+    return r0=1
   }
-  return 0
+  return r0=0
 }
 ```
 
@@ -100,9 +110,9 @@ The only other comparison that can be chained is `==`:
 ```
 fn r0 equal = isEqual(r0=a, r1=b, r2=c) {
   if a == b == c {
-    return 1
+    return r0=1
   }
-  return 0
+  return r0=0
 }
 ```
 
@@ -111,16 +121,16 @@ Comparisons can be combined to make conditions using `and` and `or`:
 ```
 fn r0 onScreen = pointIsOnScreen(r0=screenWidth, r1=screenHeight, r2=pointX, r3=pointY) {
   if 0 <= pointX < screenWidth and 0 <= pointY < screenHeight {
-    return 1
+    return r0=1
   }
-  return 0
+  return r0=0
 }
 
 fn r0 digit = charecterIsDigit(r0=char) {
   if '0' <= char <= '9' or char == '.' {
-    return 1
+    return r0=1
   }
-  return 0
+  return r0=0
 }
 ```
 
@@ -140,26 +150,27 @@ while false {
 ```
 func r0 different = isDifferent(r0=a, r1=b, r2=c) {
   if a != b and a != c and b != c {
-    return 1
+    return r0=1
   }
-  return 0
+  return r0=0
 }
 ```
 
 `and` is more important in order of operations then `or`:
 
 ```
+// TODO: This example does not work with the current common assembly compiler
 func r0 slow = slowCompilationSpeed(r0=slowComputer, r1=lang) {
   if slowComputer and lang == "Rust" or lang == "Cpp" or lang == "C++" {
-    return 1
+    return r0=1
   }
-  return 0
+  return r0=0
 }
 ```
 
 # 4. Functions
 
-TODO: Create better docs then just some examples.
+TODO: Create better docs than just some examples.
 
 ```
 fn r0 result = double(r0=number) {
@@ -181,11 +192,11 @@ fn r0 prime = isPrime(r1=num) {
   r0 factorToCheck = 2
   while factorToCheck < num {
     if (num % factorToCheck) == 0 {
-      return 0
+      return r0=0
     }
     factorToCheck++
   }
-  return 1
+  return r0=1
 }
 ```
 
