@@ -31,8 +31,35 @@
 A list of some other things that need doing before a V1.0 release:
 
 - A type system
+- Add safety garuntees:
+  - No dereferencing of invalid pointers:
+    - No use after free
+    - No null pointer dereference
+  - No double free
+  - Unused objects are forced to be cleaned up, so that memory leaks are not possible:
+    - Free pointers
+    - Close files
+  - Thread safe code
+- The ability for the compiler to automatically run code at compile time if:
+  - That code doesn't depend on any state that would change at runtime
+  - The compiler can reproduce any side affects that the code creates at runtime
+- The compiler can be certain about both of these charecteristics by adding function definitions that describe:
+  - Which syscalls are used by the function (and all the functions it calls)
+  - If that function or any function that it calls use the `sysret` instruction
+  - What side affects are caused by that function and all of the functions that it calls
+- Macros
+  - These could be functions that:
+    - Take in:
+      - An AST of code
+      - A list of the other function definitions
+    - Return either:
+      - An AST of common assembly code
+      - A list of errors present in the AST argument
+  - These could be called like `macro!(AST)`
 - Same developer experience as [high level assembly](https://github.com/hmhamza/hla-high-level-assembly-examples/blob/master/1.%20sumInputs.hla)
-- A way to enforce that a program follows some style guidelines by accesing the compiler, for example forcing a program to name variables following a certain convention
+- A way to enforce that a program follows some style guidelines by accesing the compiler
+  - For example forcing a program to name variables following a certain convention
+  - This could be achieved with a macro that wraps the code that you want to enforce the convention for
 - An `assert` function that dumps the program state if a condition is not met
 - A way to debug code
 - Add switch statements
@@ -51,10 +78,12 @@ A list of some other things that need doing before a V1.0 release:
       - If there is a jump statement that jumps to another jump statement, then modify the first jump statement to jump directly to where the second jump statement jumps to
       - Use `inc register` rather than `add 1, register`
       - If a jump label is never jumped to, and the code above the jump label always goes somewhere else, then the code between the jump label and the next jump label can be removed
+      - For arm, optimize `a = b; a += c` into `a = b + c`
     - Suppports lots of compilation targets:
       - WASM
       - X86-64
       - Arm64
+      - LLVM IR
       - RiscV??
       - JS??
     - Supports lots of "OS"s:
@@ -107,13 +136,22 @@ A list of some other things that need doing before a V1.0 release:
 
 # Performance
 
-A list of ways to benchmark common assembly compared to other languages:
+## Benchmarking common assembly
 
-- N-body simulation
-- Indexed access to a sequence of 12 integers
-- Generate mandlebrot set portable bitmap file
-- Calculations with arbritrary precesion arithmatic
-- Allocate, treverse, and deallocate binary trees
+- To benchmark common assembly compared to other languages, a program that runs a loop several hundred times could be used
+- The loop could:
+  - Use seeded randomness to pick a performance benchmark from the following:
+    - N-body simulation
+    - Indexed access to a sequence of 12 integers
+    - Generate mandlebrot set portable bitmap file
+    - Calculations with arbritrary precesion arithmatic
+    - Allocate, traverse, and deallocate binary trees
+    - Sort a list
+    - Search for prime numbers
+  - Run the performance benchmark
+  - Print the result of the performace benchmark to stdout
+
+## Common assembly performance improvements
 
 A list of performance improvements compared to low level languages such as C/C++/Rust/Odin/Zig/Jai/D:
 
