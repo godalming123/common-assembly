@@ -17,22 +17,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	println("Lexing into a list of keywords...")
-	keywords, errs := lexCode(string(rawText))
-	if printErrorsInCode(fileName, strings.Split(string(rawText), "\n"), errs) {
-		os.Exit(1)
-	}
-
-	println("Parsing keywords into abstract syntax tree...")
-	AST, error := keywordsToAST(keywords)
-	if error.msg != nil {
-		printErrorsInCode(fileName, strings.Split(string(rawText), "\n"), []codeParsingError{error})
-		os.Exit(1)
-	}
-
-	println("Compiling abstract syntax tree into assembly...")
-	assembly, errs := compileAssembly(AST)
-	if printErrorsInCode(fileName, strings.Split(string(rawText), "\n"), errs) {
+	assembly, errs := codeToAssembly(string(rawText), passablePrintln)
+	if printErrorsInCode(fileName, strings.Split(string(rawText), "\n"), errs, passablePrintln) {
 		os.Exit(1)
 	}
 

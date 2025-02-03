@@ -5,54 +5,54 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	//"github.com/davecgh/go-spew/spew"
 )
 
-// This type is used to represent the type of keyword that a keyword is, and the type of ASTitem
-// that an ASTitem is. The table below shows what kind of values would be in `keyword.contents` and
-// `ASTitem.name` if for a keyword, or ASTitem of that `typeOfParsedKeywordOrASTitem`.
+// This type is used to represent the type of keyword that a keyword is. The
+// table below shows what kind of values would be in `keyword.contents` for
+// a keyword of that `keywordType`.
 //
-//go:generate go run golang.org/x/tools/cmd/stringer -type=typeOfParsedKeywordOrASTitem
-type typeOfParsedKeywordOrASTitem uint8
+//go:generate go run golang.org/x/tools/cmd/stringer -type=keywordType
+type keywordType uint8
 
 const (
-	Unknown typeOfParsedKeywordOrASTitem = iota
-	//                // keyword.contents                       // ASTitem.name                 //
-	// -------------- // -------------------------------------- // ---------------------------- //
-	Name              // myFuncName1, myVarName2                // myVarName2                   //
-	Register          // b0, b1, b2..., s0, s1, s2...           // SAME                         //
-	StringValue       // "Foo", "Bar"                           // Foo, Bar                     //
-	CharValue         // 'a', '\n'                              // a, \n                        //
-	BoolValue         // true, false                            // SAME                         //
-	IntNumber         // 4, 23                                  // SAME                         //
-	FloatNumber       // 2.1, 5.8                               // SAME                         //
-	IncreaseNesting   // (, {, [                                // INVALID                      //
-	DecreaseNesting   // ), }, ]                                // INVALID                      //
-	Function          // fn                                     // myFunctionName               //
-	FunctionReturn    // return                                 // NONE                         //
-	FunctionArgs      // INVALID                                // NONE                         //
-	SetToAValue       // INVALID                                // NONE                         //
-	DropVariable      // drop                                   // NONE                         //
-	Assignment        // =                                      // NONE                         //
-	Increment         // ++                                     // NONE                         //
-	Decrement         // --                                     // NONE                         //
-	PlusEquals        // +=                                     // NONE                         //
-	MinusEquals       // -=                                     // NONE                         //
-	MultiplyEquals    // *=                                     // NONE                         //
-	DivideEquals      // /=                                     // NONE                         //
-	WhileLoop         // while                                  // NONE                         //
-	BreakStatement    // break                                  // NONE                         //
-	ContinueStatement // continue                               // NONE                         //
-	IfStatement       // if                                     // NONE                         //
-	ElifStatement     // elif                                   // INVALID                      //
-	ElseStatement     // else                                   // NONE                         //
-	ComparisonSyntax  // ==, !=, >, <, >=, <=                   // SAME                         //
-	And               // and                                    // NONE                         //
-	Or                // or                                     // NONE                         //
-	ListSyntax        // ,                                      // INVALID                      //
-	Import            // import                                 // std, myFancyLibrary          //
-	Dereference       // ^                                      // NONE                         //
-	Comment           // # My comment 2                         // INVALID                      //
-	Newline           // \n                                     // INVALID                      //
+	Unknown keywordType = iota
+	//                // keyword.contents             //
+	// -------------- // ---------------------------- //
+	Name              // myFuncName1, myVarName2      //
+	RegisterKeyword   // b0, b1, b2..., s0, s1, s2... //
+	StringValue       // "Foo", "Bar"                 //
+	CharValue         // 'a', '\n'                    //
+	BoolValue         // true, false                  //
+	PositiveInteger   // 4, 23                        //
+	NegativeInteger   // -4, -5                       //
+	Decimal           // 2.1, 5.8                     //
+	IncreaseNesting   // (, {, [                      //
+	DecreaseNesting   // ), }, ]                      //
+	Function          // fn                           //
+	FunctionReturn    // return                       //
+	DropVariable      // drop                         //
+	Assignment        // =                            //
+	Increment         // ++                           //
+	Decrement         // --                           //
+	PlusEquals        // +=                           //
+	MinusEquals       // -=                           //
+	MultiplyEquals    // *=                           //
+	DivideEquals      // /=                           //
+	WhileLoop         // while                        //
+	BreakStatement    // break                        //
+	ContinueStatement // continue                     //
+	IfStatement       // if                           //
+	ElifStatement     // elif                         //
+	ElseStatement     // else                         //
+	ComparisonSyntax  // ==, !=, >, <, >=, <=         //
+	And               // and                          //
+	Or                // or                           //
+	ListSyntax        // ,                            //
+	Import            // import                       //
+	Dereference       // ^                            //
+	Comment           // # My comment 2               //
+	Newline           // \n                           //
 )
 
 // Useful unicode charecters
@@ -81,17 +81,17 @@ const (
 	Error
 )
 
-func checkRegisterListsAreTheSame(expectedRegisters []int, givenRegisters []registerAndLocation) codeParsingError {
+func checkRegisterListsAreTheSame(expectedRegisters []Register, givenRegisters []registerAndLocation) codeParsingError {
 	if len(expectedRegisters) != len(givenRegisters) {
 		return codeParsingError{
-			location: givenRegisters[0].location,
-			msg:      errors.New("Expected " + fmt.Sprint(len(expectedRegisters)) + " items, got " + fmt.Sprint(len(givenRegisters)) + " items"),
+			textLocation: givenRegisters[0].location,
+			msg:          errors.New("Expected " + fmt.Sprint(len(expectedRegisters)) + " items, got " + fmt.Sprint(len(givenRegisters)) + " items"),
 		}
 	}
 	for i := range expectedRegisters {
 		if expectedRegisters[i] != givenRegisters[i].register {
 			return codeParsingError{
-				location: givenRegisters[i].location,
+				textLocation: givenRegisters[i].location,
 				msg: errors.New("On register number " + fmt.Sprint(i+1) + ": expected the register r" +
 					fmt.Sprint(expectedRegisters[i]) + ", got the register r" +
 					fmt.Sprint(givenRegisters[i].register)),
@@ -117,35 +117,66 @@ func mapListWithExtraArgs[inputType any, outputType any, extraArgsType any](list
 	return returnList
 }
 
+// Println cannot be passed as a function arg in go
+func passablePrintln(args ...any) {
+	fmt.Println(args...)
+}
+
+func codeToAssembly(code string, printLineFunc func(...any)) (string, []codeParsingError) {
+	printLineFunc("Lexing into a list of keywords...")
+	keywords, errs := lexCode(code)
+	if len(errs) > 0 {
+		return "", errs
+	}
+
+	printLineFunc("Parsing keywords into abstract syntax tree...")
+	AST, err := parseTopLevelASTitems(keywords)
+	if err.msg != nil {
+		return "", []codeParsingError{err}
+	}
+
+	// TODO: Figure out the best method to print the AST type
+	// spew.Dump(AST)
+
+	printLineFunc("Compiling abstract syntax tree into assembly...")
+	return compileAssembly(AST)
+}
+
 // Prints each error in `errors` with the 10 lines of code around where the
 // error occured. Assumes that `errors` is in order of their `location.line`
 // property.
-func printErrorsInCode(fileName string, fileLines []string, errors []codeParsingError) bool {
+func printErrorsInCode(
+	fileName string,
+	fileLines []string,
+	errors []codeParsingError,
+	printLineFunc func(...any),
+) bool {
 	if len(errors) == 0 {
 		return false
 	}
-	println(ansiBold, "===============", len(errors), "errors encountered in", fileName, "===============", ansiReset)
-	charectersNeededForLineNumber := len(fmt.Sprint(errors[len(errors)-1].location.line))
+	printLineFunc(ansiBold, "===============", len(errors), "errors encountered in", fileName, "===============", ansiReset)
+	charectersNeededForLineNumber := len(fmt.Sprint(errors[len(errors)-1].textLocation.line))
 	currentErrorIndex := 0
 	shouldContinue := true
 	for shouldContinue {
-		lineNumber := max(0, errors[currentErrorIndex].location.line-5)
-		groupEnd := min(len(fileLines), errors[currentErrorIndex].location.line+5)
+		lineNumber := max(0, errors[currentErrorIndex].textLocation.line-5)
+		groupEnd := min(len(fileLines), errors[currentErrorIndex].textLocation.line+5)
 		if currentErrorIndex != 0 {
-			println("...")
+			printLineFunc("...")
 		}
 		for lineNumber < groupEnd {
-			// TODO: Add code hightlighting to the line priting
-			println(
-				addWhitespaceToStart(fmt.Sprint(lineNumber+1), charectersNeededForLineNumber+1) +
-					string(verticalLine) +
-					fileLines[lineNumber])
+			// TODO: Add code hightlighting to the line printing
+			printLineFunc(
+				addWhitespaceToStart(fmt.Sprint(lineNumber+1), charectersNeededForLineNumber+1),
+				string(verticalLine),
+				fileLines[lineNumber],
+			)
 			// For each error on the current line, print the error
-			for errors[currentErrorIndex].location.line == lineNumber+1 {
-				groupEnd = min(len(fileLines), errors[currentErrorIndex].location.line+5)
+			for max(1, errors[currentErrorIndex].textLocation.line) == lineNumber+1 {
+				groupEnd = min(len(fileLines), errors[currentErrorIndex].textLocation.line+5)
 				print(strings.Repeat(" ", charectersNeededForLineNumber+2))
 				for index, char := range fileLines[lineNumber] {
-					if index >= errors[currentErrorIndex].location.column-1 {
+					if index >= errors[currentErrorIndex].textLocation.column-1 {
 						break
 					} else if char == '\t' {
 						print("\t")
@@ -153,7 +184,7 @@ func printErrorsInCode(fileName string, fileLines []string, errors []codeParsing
 						print(" ")
 					}
 				}
-				println("^ " + ansiBold + errors[currentErrorIndex].msg.Error() + ansiReset)
+				printLineFunc("^ " + ansiBold + errors[currentErrorIndex].msg.Error() + ansiReset)
 				if currentErrorIndex >= len(errors)-1 {
 					shouldContinue = false
 					break
@@ -226,6 +257,8 @@ type textLocation struct {
 	line   int
 	column int
 }
+
+func (location textLocation) location() textLocation { return location }
 
 func splitSlice[T any](sliceToSplit []T, shouldSplit func(T) bool) [][]T {
 	lastSplitIndex := -1
@@ -302,6 +335,8 @@ type listIterator[T any] struct {
 	list         []T
 }
 
+// Increments `currentIndex` if it isn't the index of the last item. Returns true if
+// `currentIndex` was incremented, and false otherwise.
 func (list *listIterator[T]) next() bool {
 	if list.currentIndex+1 < len(list.list) {
 		list.currentIndex++

@@ -74,7 +74,7 @@ func (text *textAndPosition) findUntilWithIteratedString(checker func(byte) bool
 // spaces that aren't a part of a StringValue or CharValue keyword.
 type keyword struct {
 	contents    string
-	keywordType typeOfParsedKeywordOrASTitem
+	keywordType keywordType
 	nesting     uint8
 	location    textLocation
 }
@@ -140,8 +140,8 @@ func printKeywords(keywords []keyword) {
 /////////////////////////////
 
 type codeParsingError struct {
-	msg      error
-	location textLocation
+	msg error
+	textLocation
 }
 
 ////////////////////////
@@ -176,23 +176,22 @@ func isNotVariableCharecter(charecter byte) bool {
 // MAIN CODE //
 ///////////////
 
-func numberToKeyword(text *textAndPosition) (typeOfParsedKeywordOrASTitem, string) {
+// The returned bool is true if the number is a decimal, and false otherwise
+func positiveNumberToKeyword(text *textAndPosition) (bool, string) {
 	// Parse any digits (and `_`) into keywordContents
-	keywordType := IntNumber
 	keywordContents := text.findUntilWithIteratedString(isNotNumber)
 
-	// Handle if the number if a float
-	if text.index < len(text.text)-1 &&
-		text.text[text.index] == '.' &&
-		text.text[text.index+1] != '.' {
-		keywordType = FloatNumber
-		keywordContents += "."
-		text.moveForward()
-		keywordContents += text.findUntilWithIteratedString(isNotNumber)
+	// Early return if their is not a decimal after the number
+	if text.index >= len(text.text)-1 ||
+		text.text[text.index] != '.' ||
+		text.text[text.index+1] == '.' {
+		return false, keywordContents
 	}
 
-	// Return
-	return keywordType, keywordContents
+	// Handle the decimal
+	keywordContents += "."
+	assert(eq(text.moveForward(), true))
+	return true, keywordContents + text.findUntilWithIteratedString(isNotNumber)
 }
 
 func lexCode(code string) ([]keyword, []codeParsingError) {
@@ -244,30 +243,30 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 			keywordContents = "'"
 			if text.moveForward() {
 				add(&parsingErrors, codeParsingError{
-					msg:      errors.New("Unexpected end of text while parsing charecter value"),
-					location: text.location,
+					msg:          errors.New("Unexpected end of text while parsing charecter value"),
+					textLocation: text.location,
 				})
 			}
 			if text.text[text.index] == '\\' {
 				keywordContents += "\\"
 				if text.moveForward() {
 					add(&parsingErrors, codeParsingError{
-						msg:      errors.New("Unexpected end of text while parsing charecter value"),
-						location: text.location,
+						msg:          errors.New("Unexpected end of text while parsing charecter value"),
+						textLocation: text.location,
 					})
 				}
 			}
 			keywordContents += string(text.text[text.index]) + "'"
 			if text.moveForward() {
 				add(&parsingErrors, codeParsingError{
-					msg:      errors.New("Unexpected end of text while parsing charecter value"),
-					location: text.location,
+					msg:          errors.New("Unexpected end of text while parsing charecter value"),
+					textLocation: text.location,
 				})
 			}
 			if text.text[text.index] != '\'' {
 				add(&parsingErrors, codeParsingError{
-					msg:      errors.New("Expected `'' to end charecter value, got `" + string(text.text[text.index]) + "`"),
-					location: text.location,
+					msg:          errors.New("Expected `'' to end charecter value, got `" + string(text.text[text.index]) + "`"),
+					textLocation: text.location,
 				})
 			}
 			text.moveForward()
@@ -328,13 +327,19 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 				text.moveForward()
 				if text.text[text.index] < '0' || text.text[text.index] > '9' {
 					add(&parsingErrors, codeParsingError{
-						msg:      errors.New("After -, expecting a number"),
-						location: keywordPosition,
+						msg:          errors.New("After `-`, expecting a number"),
+						textLocation: keywordPosition,
 					})
 					continue
 				}
-				keywordType, keywordContents = numberToKeyword(&text)
+				hasDecimal := false
+				hasDecimal, keywordContents = positiveNumberToKeyword(&text)
 				keywordContents = "-" + keywordContents
+				if hasDecimal {
+					keywordType = Decimal
+				} else {
+					keywordType = NegativeInteger
+				}
 			case ",":
 				keywordType = ListSyntax
 			default:
@@ -344,7 +349,7 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 							keywordContents +
 							"`. Known symbol serieses are (, {, [, ), }, ], #, :=, ::, =, |>, ==, ||, &&, <=, >=, <, >, +, -, *, /, %, ,, ..., .., .",
 					),
-					location: keywordPosition,
+					textLocation: keywordPosition,
 				})
 				continue
 			}
@@ -373,7 +378,7 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 				keywordType = BoolValue
 			case "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
 				"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15":
-				keywordType = Register
+				keywordType = RegisterKeyword
 			case "return":
 				keywordType = FunctionReturn
 			case "import":
@@ -399,14 +404,20 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 			}
 
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			keywordType, keywordContents = numberToKeyword(&text)
+			hasDecimal := false
+			hasDecimal, keywordContents = positiveNumberToKeyword(&text)
+			if hasDecimal {
+				keywordType = Decimal
+			} else {
+				keywordType = PositiveInteger
+			}
 
 		default:
 			add(&parsingErrors, codeParsingError{
 				msg: errors.New(
 					"Unexpected charecter: `" + string(text.text[text.index]) + "`",
 				),
-				location: keywordPosition,
+				textLocation: keywordPosition,
 			})
 			text.moveForward()
 			continue

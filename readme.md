@@ -4,12 +4,17 @@
 > Common assembly is pre-alpha, the (probably buggy) code needs at least some refactoring, and the compiler can barely compile a hello world. Other then a compiler, there also isn't any other developer tooling such a syntax highlighting or an LSP. Here is a list of things that need doing before even a V0.1 release:
 >
 > - Fix /= and *=
-> - Fix myFunction(0) cuasing an assertion to fail in the compiler
 > - Rework parts of `compiler.go` so that it creates one a strongly-typed set of instructions that can be converted into every archicetecture with the minimal possible code
 >   - Suppport more compilation targets other then just linux x86-64
 >   - Fix the assembler warnings that say "no instruction mnemonic suffix given and no register operands; using default for `...'"
 > - Add support for floats
 > - A (very basic) cross-platform standard library
+>   - An arena implementation that has 4 functions:
+>     - `allocateArena`
+>     - `expandArena`
+>     - `shrinkArena`
+>     - `deallocateArena`
+>   - The main function would have an argument called `dataArena`, that works by expanding and shrinking the program break
 > - A code highlighter
 > - Support for importing one file from another
 > - While loops:
@@ -179,7 +184,11 @@ A list of performance improvements compared to low level languages such as C/C++
 # Code style for the go code in this repo
 
 - If you have more than 4 levels of indentation, then you need to refactor your code
-- Lines cannot be longer than 100 charecters
+- Lines cannot be longer than 80 charecters
+- Function calls can be formatted in three ways:
+  - If the resulting line is <=80 charecters long, the function call is put on one line
+  - If the resulting lines are <= 80 charecters long, and there are only 2 lines, the function call can be hard-wrapped by it's arguments
+  - Otherwise, each argument in the function call is given it's own line
 
 # Stargazers over time
 
