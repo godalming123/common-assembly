@@ -8,53 +8,6 @@ import (
 	//"github.com/davecgh/go-spew/spew"
 )
 
-// This type is used to represent the type of keyword that a keyword is. The
-// table below shows what kind of values would be in `keyword.contents` for
-// a keyword of that `keywordType`.
-//
-//go:generate go run golang.org/x/tools/cmd/stringer -type=keywordType
-type keywordType uint8
-
-const (
-	Unknown keywordType = iota
-	//                // keyword.contents             //
-	// -------------- // ---------------------------- //
-	Name              // myFuncName1, myVarName2      //
-	RegisterKeyword   // b0, b1, b2..., s0, s1, s2... //
-	StringValue       // "Foo", "Bar"                 //
-	CharValue         // 'a', '\n'                    //
-	BoolValue         // true, false                  //
-	PositiveInteger   // 4, 23                        //
-	NegativeInteger   // -4, -5                       //
-	Decimal           // 2.1, 5.8                     //
-	IncreaseNesting   // (, {, [                      //
-	DecreaseNesting   // ), }, ]                      //
-	Function          // fn                           //
-	FunctionReturn    // return                       //
-	DropVariable      // drop                         //
-	Assignment        // =                            //
-	Increment         // ++                           //
-	Decrement         // --                           //
-	PlusEquals        // +=                           //
-	MinusEquals       // -=                           //
-	MultiplyEquals    // *=                           //
-	DivideEquals      // /=                           //
-	WhileLoop         // while                        //
-	BreakStatement    // break                        //
-	ContinueStatement // continue                     //
-	IfStatement       // if                           //
-	ElifStatement     // elif                         //
-	ElseStatement     // else                         //
-	ComparisonSyntax  // ==, !=, >, <, >=, <=         //
-	And               // and                          //
-	Or                // or                           //
-	ListSyntax        // ,                            //
-	Import            // import                       //
-	Dereference       // ^                            //
-	Comment           // # My comment 2               //
-	Newline           // \n                           //
-)
-
 // Useful unicode charecters
 const horizontalLine rune = '─'
 const verticalLine rune = '│'
@@ -68,7 +21,7 @@ const topRightQuarterCircle rune = '╮'
 const bottomLeftQuarterCircle rune = '╰'
 const bottomRightQuarterCircle rune = '╯'
 
-// Useful ANIS codes
+// Useful ANSI codes
 var ansiReset string = "\033[0m"
 var ansiBold string = "\033[1m"
 
@@ -105,14 +58,6 @@ func mapList[inputType any, outputType any](list []inputType, mapFunc func(input
 	returnList := make([]outputType, len(list))
 	for index, item := range list {
 		returnList[index] = mapFunc(item)
-	}
-	return returnList
-}
-
-func mapListWithExtraArgs[inputType any, outputType any, extraArgsType any](list []inputType, mapFunc func(inputType, ...extraArgsType) outputType, extraArgs extraArgsType) []outputType {
-	returnList := make([]outputType, len(list))
-	for index, item := range list {
-		returnList[index] = mapFunc(item, extraArgs)
 	}
 	return returnList
 }
@@ -259,20 +204,6 @@ type textLocation struct {
 }
 
 func (location textLocation) location() textLocation { return location }
-
-func splitSlice[T any](sliceToSplit []T, shouldSplit func(T) bool) [][]T {
-	lastSplitIndex := -1
-	returnValue := [][]T{}
-	for index, item := range sliceToSplit {
-		if shouldSplit(item) {
-			add(&returnValue, sliceToSplit[lastSplitIndex+1:index])
-			lastSplitIndex = index
-		} else if index == len(sliceToSplit)-1 {
-			add(&returnValue, sliceToSplit[lastSplitIndex+1:])
-		}
-	}
-	return returnValue
-}
 
 func assert(err error) {
 	if err != nil {

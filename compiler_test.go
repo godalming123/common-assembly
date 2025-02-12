@@ -7,15 +7,23 @@ import (
 )
 
 func TestMainCode(t *testing.T) {
-	assembly, errs := codeToAssembly(mainCommonAssemblyCode, t.Log)
-	if printErrorsInCode("main.ca", strings.Split(mainCommonAssemblyCode, "\n"), errs, t.Log) {
-		t.FailNow()
+	testOrBenchmarkMainCode(t)
+}
+
+func BenchmarkMainCode(b *testing.B) {
+	testOrBenchmarkMainCode(b)
+}
+
+func testOrBenchmarkMainCode(tb testing.TB) {
+	assembly, errs := codeToAssembly(mainCommonAssemblyCode, tb.Log)
+	if printErrorsInCode("main.ca", strings.Split(mainCommonAssemblyCode, "\n"), errs, tb.Log) {
+		tb.FailNow()
 	}
 	if assembly != mainExpectedAssemblyCode {
 		// TODO: Ideally this would print the difference between the expected
 		// assembly, and the generated assembly, rathor than just printing the
 		// generated assembly.
-		t.Fatalf("Got the wrong assembly. Here is the assembly `codeToAssmbly` returned:\n%s", assembly)
+		tb.Fatalf("Got the wrong assembly. Here is the assembly `codeToAssmbly` returned:\n%s", assembly)
 	}
 }
 

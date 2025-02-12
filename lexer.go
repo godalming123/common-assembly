@@ -68,6 +68,53 @@ func (text *textAndPosition) findUntilWithIteratedString(checker func(byte) bool
 // KEYWORD TYPE //
 //////////////////
 
+// This type is used to represent the type of keyword that a keyword is. The
+// table below shows what kind of values would be in `keyword.contents` for
+// a keyword of that `keywordType`.
+//
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -type=keywordType
+type keywordType uint8
+
+const (
+	Unknown keywordType = iota
+	//                // keyword.contents             //
+	// -------------- // ---------------------------- //
+	Name              // myFuncName1, myVarName2      //
+	RegisterKeyword   // b0, b1, b2..., s0, s1, s2... //
+	StringValue       // "Foo", "Bar"                 //
+	CharValue         // 'a', '\n'                    //
+	BoolValue         // true, false                  //
+	PositiveInteger   // 4, 23                        //
+	NegativeInteger   // -4, -5                       //
+	Decimal           // 2.1, 5.8                     //
+	IncreaseNesting   // (, {, [                      //
+	DecreaseNesting   // ), }, ]                      //
+	Function          // fn                           //
+	FunctionReturn    // return                       //
+	DropVariable      // drop                         //
+	Assignment        // =                            //
+	Increment         // ++                           //
+	Decrement         // --                           //
+	PlusEquals        // +=                           //
+	MinusEquals       // -=                           //
+	MultiplyEquals    // *=                           //
+	DivideEquals      // /=                           //
+	WhileLoop         // while                        //
+	BreakStatement    // break                        //
+	ContinueStatement // continue                     //
+	IfStatement       // if                           //
+	ElifStatement     // elif                         //
+	ElseStatement     // else                         //
+	ComparisonSyntax  // ==, !=, >, <, >=, <=         //
+	And               // and                          //
+	Or                // or                           //
+	ListSyntax        // ,                            //
+	Import            // import                       //
+	Dereference       // ^                            //
+	Comment           // # My comment 2               //
+	Newline           // \n                           //
+)
+
 // Stores an individual keyword. When there is a list of keywords, the
 // concatenation of all of the keywords contents should be equal to the original
 // code that was lexed into the list of keywords, but without `\r`, `\t`, or
