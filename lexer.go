@@ -237,7 +237,7 @@ func positiveNumberToKeyword(text *textAndPosition) (bool, string) {
 
 	// Handle the decimal
 	keywordContents += "."
-	assert(eq(text.moveForward(), true))
+	assert(eq(text.moveForward(), false))
 	return true, keywordContents + text.findUntilWithIteratedString(isNotNumber)
 }
 

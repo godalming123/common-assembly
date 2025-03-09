@@ -9,10 +9,11 @@
 >   - Fix the assembler warnings that say "no instruction mnemonic suffix given and no register operands; using default for `...'"
 > - Add support for floats
 > - A (very basic) cross-platform standard library
->   - An arena implementation that has 4 functions:
+>   - An arena implementation that has 5 functions:
 >     - `allocateArena`
 >     - `expandArena`
 >     - `shrinkArena`
+>     - `resetArena` - frees every item in an arena without freeing the arena itself
 >     - `deallocateArena`
 >   - The main function would have an argument called `dataArena`, that works by expanding and shrinking the program break
 > - A code highlighter
@@ -66,7 +67,6 @@ A list of some other things that need doing before a V1.0 release:
   - For example forcing a program to name variables following a certain convention
   - This could be achieved with a macro that wraps the code that you want to enforce the convention for
 - An `assert` function that dumps the program state if a condition is not met
-- A way to debug code
 - Add switch statements
 - Add support for accessing the lower 32 bits of a 64 bit register if there is a performance benefit
 - Lots of developer tooling:
@@ -76,7 +76,9 @@ A list of some other things that need doing before a V1.0 release:
       - Give error messages for unused code, instead of ignoring most errors that can occur in functions that never get called
       - A warning for unused variables
       - Add support for printing multiple parser or compiler errors each time the compiler is ran rathor then only printing one at a time
-      - Instead of just pointing to the first charecter of a keyword, the errors could point to the whole keyword
+      - Instead of just pointing to the first charecter of a keyword, the errors should point to the whole keyword
+    - A `watch` command to automatically hot reload when the code changes if there aren't any compiler errors
+    - Debugging, or the ability to generate executables with good debug symbols that work with debuggers and hot reload togethor
     - Generates optimized executables:
       - Tail call optimizations
       - Use left shifts and right shifts instead of dividing/multiplying by binary numbers
@@ -89,6 +91,7 @@ A list of some other things that need doing before a V1.0 release:
       - X86-64
       - Arm64
       - LLVM IR
+      - GPU code (see [ways of running code on the GPU](#ways-of-runnning-code-on-the-gpu))
       - RiscV??
       - JS??
     - Supports lots of "OS"s:
@@ -193,3 +196,45 @@ A list of performance improvements compared to low level languages such as C/C++
 # Stargazers over time
 
 [![Stargazers over time](https://starchart.cc/godalming123/common-assembly.svg)](https://starchart.cc/godalming123/common-assembly)
+
+# Ways of running code on the GPU
+
+> [!NOTE]
+> These lists are non-exhaustive. Compiling common assembly to GPU code is barely a vague idea right now.
+
+## Shader languages
+
+All of the below are maintained, and can create compute shaders.
+
+| Abbreviation                              | API(s)            |
+| ----------------------------------------- | ----------------- |
+| HLSL                                      | DirectX           |
+| GLSL                                      | Vulkan and OpenGL |
+| MSL                                       | Metal             |
+| WGSL                                      | WebGPU            |
+| Cuda                                      | Cuda and zluda    |
+| ROCm                                      | ROCm              |
+| [OpenCL](https://www.khronos.org/opencl/) | -                 |
+| [SPIR-V](https://www.khronos.org/spirv/)  | Vulkan            |
+| [SysCl](https://www.khronos.org/sycl/)    | -                 |
+
+## APIs
+
+| Name                                                                  | Maintained | Open source | Linux | Windows | Mac | AMD | Intel | Nvidia |
+| --------------------------------------------------------------------- | ---------- | ----------- | ----- | ------- | --- | --- | ----- | ------ |
+| [Vulkan](https://www.vulkan.org/)                                     | ✓          | ✓           | ✓     | ✓       | ✓   | ✓   | ✓     | ✓      |
+| [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) | ✓          | ✓           | ✓     | ✓       | ✓   | ✓   | ✓     | ✓      |
+| DirectX                                                               | ✓          | ✗           | ✗     | ✓       | ✗   | ✓   | ✓     | ✓      |
+| [ROCm](https://rocm.docs.amd.com/)                                    | ✓          | ✓           | ✓     | ✗       | ✗   | ✓   | ✗     | ✗      |
+| [ZLUDA](https://github.com/vosen/ZLUDA) (still in development)        | ✓          | ✓           | ✓     | ✓       | ✗   | ✓   | ✗     | ✗      |
+| [CUDA](https://developer.nvidia.com/cuda-toolkit)                     | ✓          | ✗           | ✓     | ✓       | ✗   | ✗   | ✗     | ✓      |
+| [Metal](https://developer.apple.com/metal/)                           | ✓          | ✗           | ✗     | ✗       | ✓   | ✗   | ✗     | ✗      |
+| OpenGL                                                                | ✗          | ✓           | ✓     | ✓       | ✗   | ✓   | ✓     | ✓      |
+
+## Transpiling shader languages
+
+| From   | To              | Via                                |
+| ------ | --------------- | ---------------------------------- |
+| HLSL   | SPIR-V          | DirectX shader compiler or glslang |
+| GLSL   | SPIR-V          | Glslang                            |
+| SPIR-V | MSL, HLSL, GLSL | SPIR-V Cross                       |
