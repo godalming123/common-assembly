@@ -91,7 +91,7 @@ A list of some other things that need doing before a V1.0 release:
       - X86-64
       - Arm64
       - LLVM IR
-      - GPU code (see [ways of running code on the GPU](#ways-of-runnning-code-on-the-gpu))
+      - GPU code (see [ways of running code on the GPU](#ways-of-running-code-on-the-gpu))
       - RiscV??
       - JS??
     - Supports lots of "OS"s:
