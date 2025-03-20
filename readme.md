@@ -79,7 +79,7 @@ A list of some other things that need doing before a V1.0 release:
       - Instead of just pointing to the first charecter of a keyword, the errors should point to the whole keyword
     - A `watch` command to automatically hot reload when the code changes if there aren't any compiler errors
     - Debugging, or the ability to generate executables with good debug symbols that work with debuggers and hot reload togethor
-    - Generates optimized executables:
+    - Generates optimized executables (see [benchmarking common assembly](#benchmarking-common-assembly) for how we would compare this with other optimizers):
       - Tail call optimizations
       - Use left shifts and right shifts instead of dividing/multiplying by binary numbers
       - If there is a jump statement that jumps to another jump statement, then modify the first jump statement to jump directly to where the second jump statement jumps to
@@ -156,6 +156,7 @@ A list of some other things that need doing before a V1.0 release:
     - Allocate, traverse, and deallocate binary trees
     - Sort a list
     - Search for prime numbers
+    - Find a number's factorial
   - Run the performance benchmark
   - Print the result of the performace benchmark to stdout
 
@@ -163,7 +164,18 @@ A list of some other things that need doing before a V1.0 release:
 
 A list of performance improvements compared to low level languages such as C/C++/Rust/Odin/Zig/Jai/D:
 
-- There is NO implicit data copying to the stack when a function is called
+- There is NO implicit data copying:
+  - To the stack when a function is called
+  - Of the data in an array when it is expanded beyond it's max capacity
+  - Of an array when each of it's elements are iterated over
+- The compiler knows about all of the allocations in a program, so it:
+  - Can optimize multiple allocations into one allocation
+  - Can reuse previously allocated data in new allocations, provided the previous data is not used again
+- Pointers are unique by default, so the compiler can produce better optimizations by making more assumptions about the code
+- All of the code is optimized in one compilation unit, so the optimizer knows exactly what the code in other files and libraries does, rather than having to guess
+- A design that de-emphasizes or does not support polymorphism, since polymorphism:
+  - Requires another layer of pointer indirection
+  - Makes moving code from the function definition to the function call and vice-versa harder for the optimizer
 
 # DX Improvements compared to regular assembly (only applies once V0.1 is released)
 
@@ -206,17 +218,17 @@ A list of performance improvements compared to low level languages such as C/C++
 
 All of the below are maintained, and can create compute shaders.
 
-| Abbreviation                              | API(s)            |
-| ----------------------------------------- | ----------------- |
-| HLSL                                      | DirectX           |
-| GLSL                                      | Vulkan and OpenGL |
-| MSL                                       | Metal             |
-| WGSL                                      | WebGPU            |
-| Cuda                                      | Cuda and zluda    |
-| ROCm                                      | ROCm              |
-| [OpenCL](https://www.khronos.org/opencl/) | -                 |
-| [SPIR-V](https://www.khronos.org/spirv/)  | Vulkan            |
-| [SysCl](https://www.khronos.org/sycl/)    | -                 |
+| Abbreviation                              | API(s)                  |
+| ----------------------------------------- | ----------------------- |
+| HLSL                                      | DirectX                 |
+| GLSL                                      | Vulkan and OpenGL       |
+| MSL                                       | Metal                   |
+| WGSL                                      | WebGPU                  |
+| Cuda                                      | Cuda and zluda          |
+| ROCm                                      | ROCm                    |
+| [OpenCL](https://www.khronos.org/opencl/) | -                       |
+| [SPIR-V](https://www.khronos.org/spirv/)  | Vulkan                  |
+| [SysCl](https://www.khronos.org/sycl/)    | AdaptiveCpp and TriSYCL |
 
 ## APIs
 
@@ -224,6 +236,8 @@ All of the below are maintained, and can create compute shaders.
 | --------------------------------------------------------------------- | ---------- | ----------- | ----- | ------- | --- | --- | ----- | ------ |
 | [Vulkan](https://www.vulkan.org/)                                     | ✓          | ✓           | ✓     | ✓       | ✓   | ✓   | ✓     | ✓      |
 | [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) | ✓          | ✓           | ✓     | ✓       | ✓   | ✓   | ✓     | ✓      |
+| [AdaptiveCpp](https://github.com/AdaptiveCpp/AdaptiveCpp)             | ✓          | ✓           | ✓     | ✓       | ✓   | ✓   | ✓     | ✓      |
+| (TriSYCL)[https://github.com/triSYCL/triSYCL]                         | ✓          | ✓           | ✓     | ✓       | ✓   | ✓   | ✓     | ✓      |
 | DirectX                                                               | ✓          | ✗           | ✗     | ✓       | ✗   | ✓   | ✓     | ✓      |
 | [ROCm](https://rocm.docs.amd.com/)                                    | ✓          | ✓           | ✓     | ✗       | ✗   | ✓   | ✗     | ✗      |
 | [ZLUDA](https://github.com/vosen/ZLUDA) (still in development)        | ✓          | ✓           | ✓     | ✓       | ✗   | ✓   | ✗     | ✗      |

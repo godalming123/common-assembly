@@ -32,7 +32,7 @@
   </tr>
   <tr>
     <th colspan="2">Readability - How readable is the code?</th>
-    <th rowspan="2">Concise, clear syntax. The order of text in the program should show the order of runtime execution. Each package is a directory made up of common assembly files, with common assembly files that are in the same directory automatically getting access to each others functions.</th>
+    <th rowspan="2">Concise, clear syntax with one way of doing common operations. The order of text in a function should show the order of runtime execution. Each package is a directory made up of common assembly files, with common assembly files that are in the same directory automatically getting access to each others functions. The main way of naming would be snake case since it is more readable than any other case.</th>
   </tr>
   <tr>
     <th colspan="2">Modifiability - How easy is it to make changes to the code?</th>
