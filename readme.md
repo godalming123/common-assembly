@@ -80,12 +80,33 @@ A list of some other things that need doing before a V1.0 release:
     - A `watch` command to automatically hot reload when the code changes if there aren't any compiler errors
     - Debugging, or the ability to generate executables with good debug symbols that work with debuggers and hot reload togethor
     - Generates optimized executables (see [benchmarking common assembly](#benchmarking-common-assembly) for how we would compare this with other optimizers):
-      - Tail call optimizations
-      - Use left shifts and right shifts instead of dividing/multiplying by binary numbers
-      - If there is a jump statement that jumps to another jump statement, then modify the first jump statement to jump directly to where the second jump statement jumps to
-      - Use `inc register` rather than `add 1, register`
-      - If a jump label is never jumped to, and the code above the jump label always goes somewhere else, then the code between the jump label and the next jump label can be removed
-      - For arm, optimize `a = b; a += c` into `a = b + c`
+      - Is optimized from source code alone:
+        - Always: Propagate constants
+          - A global constant variable
+          - The argument of a function if it is set to the same value everywhere that the function is called
+        - Always: Simplify logic based on propagated constants, for example remove the code in an if block where the condition is `0 == 1`
+        - Always: Move values that are recomputed in the same way every time a loop runs to be outside the loop given the loop runs on average more than once
+        - Always: Remove unused functions
+        - Always: If the same code is always ran directly before or after the same function is called, then that code can be moved into the function definition
+        - Sometimes: Unzip code that branches and regathers several times with the same condition into 2 branchless paths
+      - Is optimized from source code and assembly code:
+        - Always: Use registers instead of the heap or stack
+        - Sometimes: Inline code, with the following aspects making code more likely to be inlined:
+          - The size of the inlined code is small (would have to include optimizations ran on the inlined code)
+          - The function is only used once
+          - The inlined code would be ran a large number of times
+          - The size of the function call code is large
+        - Always: Tail call optimizations
+        - Always: Optimize array math to use SIMD
+        - Always: Switch from using the `call` and `ret` instructons to using `jmp` instructions for functions that are used once
+      - Is optimized from assembly code alone:
+        - Always: If a jump label is never jumped to, and the code above the jump label always goes somewhere else, then the code between the jump label and the next jump label can be removed
+        - Always: For arm, optimize `a = b; a += c` into `a = b + c`
+        - Always: Use `inc register` rather than `add 1, register`
+        - Always: Replace branching if statements with just instructions in some cases:
+          - `compare REG1, REG2; jump_not_equal a; move REG3, REG4; a: ...` -> `compare REG1, REG2; move_equal REG3, REG4; ...`
+        - Always: Use left shifts and right shifts instead of dividing/multiplying by powers of 2
+        - Always: If there is a jump statement that jumps to another jump statement, then modify the first jump statement to jump directly to where the second jump statement jumps to
     - Suppports lots of compilation targets:
       - WASM
       - X86-64
@@ -102,7 +123,7 @@ A list of some other things that need doing before a V1.0 release:
       - Android??
       - iOS??
   - Code highlighting
-  - Formatter:
+  - Formatter (works on either an AST, or a list of keywords):
     - Insert spaces where necersarry
     - Insert tabs where necersarry (when nested)
     - Insert newlines where necersarry
@@ -113,7 +134,7 @@ A list of some other things that need doing before a V1.0 release:
     - Symbol rename
     - Symbol picker
     - Refactor code into a seperate function
-  - A way to generate docs based on code comments
+  - A way to generate docs based on code comments (works on an AST)
 
 # Installation instructions for Windows
 
@@ -157,6 +178,7 @@ A list of some other things that need doing before a V1.0 release:
     - Sort a list
     - Search for prime numbers
     - Find a number's factorial
+    - JSON decoding and encoding
   - Run the performance benchmark
   - Print the result of the performace benchmark to stdout
 
