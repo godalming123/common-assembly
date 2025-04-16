@@ -46,6 +46,12 @@ A list of some other things that need doing before a V1.0 release:
     - Free pointers
     - Close files
   - Thread safe code
+  - Ways to achieve this:
+    - Borrow checker (like in [rust](https://doc.rust-lang.org/beta/rust-by-example/scope.html))
+    - Linear types (like in [austral](https://austral-lang.org/linear-types))
+    - Mutable value semantics (like in [hylo](https://github.com/hylo-lang/hylo))
+    - Reference counting (like in [swift](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/))
+    - Garbage collection (like in [go](https://tip.golang.org/doc/gc-guide))
 - The ability for the compiler to automatically run code at compile time if:
   - That code doesn't depend on any state that would change at runtime
   - The compiler can reproduce any side affects that the code creates at runtime
