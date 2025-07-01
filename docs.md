@@ -57,31 +57,78 @@ Registers that are reserved for use with a specefic variable are used by naming 
 ```
 r0 returnCode, r5 = print(r4="Testing variables\n", r3=18)
 r0 = sysExit(r5=returnCode)
-# This code is invalid since r0 is reserved for the `returnCode` variable, so r0 cannot be mutated by naming the register since that would implicitly change the `returnCode` variable
 ```
 
-To get round this, the `drop` keyword is used at the last place where a variable is used to free a register from being reserved for a variable:
+The above code is invalid since r0 is reserved for the `returnCode` variable, so r0 cannot be mutated by naming the register since that would implicitly change the `returnCode` variable. To get round this, the `drop` keyword is used at the last place where a variable is used to free a register from being reserved for a variable:
 
 ```diff
 r0 returnCode, r5 = print(r4="Testing variables\n", r3=18)
 -r0 = sysExit(r5=returnCode)
 +r0 = sysExit(r5=drop returnCode)
-# Now the r0 register can be used just by naming the register, and `returnCode` is no longer a variable
+# Now the r0 register can be used here just by naming the register, and `returnCode` is no longer a variable.
 ```
 
-A variable can be accessed on any line of code between where the variable is defined and where the variable is dropped, or falls out of scope. This isn't always the same as any point in time between when the variable is defined, and when the variable is dropped. This means that if a variable defined outside a while loop is dropped inside the while loop, then the variable can still be accessed on the second iteration of the loop as long as it is accessed above the `drop` statement.
+Variables are implicitly dropped when they fall out of scope. A variable can be accessed on any line of code between where the variable is defined and where the variable is dropped. This is always the same as any point in time between when the variable is defined, and when the variable is dropped, since variables must be dropped in the scope that they were defined at. TODO: Although, in the future, the ability to drop a variable defined from outside scope in an if/elif/else statement may be added, as long as the variable is dropped in all of the branches of the statement.
 
-```
-r0 iteration = 0
-while iteration < 10 {
-  # `iteration` can still be accessed here, even on the second iteration of the while loop
-  drop iteration++
-  # `iteration` cannot be accessed here
-  ...
-}
-```
+# 3. Unimplemented: Data types (TODO: implement this)
 
-# 3. Conditions
+Data types define what is meant by the 64 bits of data that a register stores. Here is a list of data types in common assembly:
+
+- int
+- uint
+- float
+- pointer(typeItPointsTo)
+- list(typeOfListItem) - a pointer to the first value and a uint for the number of items in the list
+- enum:
+  - In the final type system, I would want this to have a value that can change in type
+  - This would be the type used for booleans
+
+# 4. Operations
+
+Here is a table of the x86-64 assembly instructions generated for the given operations:
+
+<table>
+  <tr>
+    <th rowspan="2">Operation</th>
+    <th colspan="7">Instruction generated for registers of type</th>
+  </tr>
+  <tr>
+    <th>Float</th>
+    <th>Int</th>
+    <th>Uint</th>
+    <th>Pointer</th>
+  </tr>
+  <tr>
+    <td>+=</td>
+    <td>add</td>
+    <td>iadd</td>
+    <td>iadd</td>
+    <td>invalid operation</td>
+  </tr>
+  <tr>
+    <td>-=</td>
+    <td>sub</td>
+    <td>isub</td>
+    <td>isub</td>
+    <td>invalid operation</td>
+  </tr>
+  <tr>
+    <td>*=</td>
+    <td>TODO</td>
+    <td>TODO</td>
+    <td>TODO</td>
+    <td>invalid operation</td>
+  </tr>
+  <tr>
+    <td>/=</td>
+    <td>TODO</td>
+    <td>TODO</td>
+    <td>TODO</td>
+    <td>invalid operation</td>
+  </tr>
+</table>
+
+# 5. Conditions
 
 Comparisons consist of `==`, `!=`, `>=`, `>`, `<=`, or `<` in between 2 values. Comparisons on there own make valid conditions:
 
@@ -168,7 +215,7 @@ func r0 slow = slowCompilationSpeed(r0=slowComputer, r1=lang) {
 }
 ```
 
-# 4. Functions
+# 6. Functions
 
 TODO: Create better docs than just some examples.
 
@@ -211,16 +258,16 @@ fn r0 result, r1 = pow(r2=base, r1=power) {
 }
 ```
 
-# 5. Syscalls
+# 7. Syscalls
 
 Common assembly provides the following syscall functions:
 
-- `r0 exitCode = sysRead (r5=fileDescriptor, r4=buffer, r3=numberOfCharecters)`
-- `r0 exitCode = sysWrite (r5=fileDescriptor, r4=text, r3=numberOfCharecters)`
-- `r0 fileDescriptor = sysOpen (r5=fileName, r4=flags, r3=mode)`
-- `r0 exitCode = sysClose (r5=fileDescriptor)`
-- `r0 exitCode = sysBrk (r5=newBreak)`
-- `r0 exitCode = sysExit (r5=status)`
+- `r0 exitCode: i64 = sysRead (r5=fileDescriptor: i64, r4=buffer: pointer, r3=numberOfCharecters: i64)`
+- `r0 exitCode: i64 = sysWrite (r5=fileDescriptor: i64, r4=text: i64, r3=numberOfCharecters: i64)`
+- `r0 fileDescriptor: i64 = sysOpen (r5=fileName: pointer, r4=flags: i64, r3=mode: i64)`
+- `r0 exitCode: i64 = sysClose (r5=fileDescriptor: i64)`
+- `r0 exitCode: i64 = sysBrk (r5=newBreak: i64)`
+- `r0 exitCode: i64 = sysExit (r5=status: i64)`
 
 These get compiled into inline assembly, for example `r0=sysWrite(r4="Hello world\n", r3=12, r5=1)` gets compiled to the following assembly for x86-64 linux:
 

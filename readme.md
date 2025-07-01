@@ -8,14 +8,16 @@
 >   - Suppport more compilation targets other then just linux x86-64
 >   - Fix the assembler warnings that say "no instruction mnemonic suffix given and no register operands; using default for `...'"
 > - Add support for floats
-> - A (very basic) cross-platform standard library
->   - An arena implementation that has 5 functions:
->     - `allocateArena`
->     - `expandArena`
->     - `shrinkArena`
->     - `resetArena` - frees every item in an arena without freeing the arena itself
->     - `deallocateArena`
->   - The main function would have an argument called `dataArena`, that works by expanding and shrinking the program break
+> - A (very basic) cross-platform standard library:
+>   - An arena implementation:
+>     - Would be based on 5 operations:
+>       - `allocateArena`
+>       - `expandArena`
+>       - `shrinkArena`
+>       - `resetArena` - frees every item in an arena without freeing the arena itself
+>       - `deallocateArena`
+>     - There would be a main arena that works by expanding and shrinking the program break rather than requesting backing memory and freeing backing memory for a large set of contiguos pages
+>     - Depending on the langauge design, the operations might not be named in the code
 > - A code highlighter
 > - Support for importing one file from another
 > - While loops:
@@ -27,9 +29,20 @@
 > - Add the option to drop a variable from outside scope in the scope of an if/elif/else block as long as the variable is dropped in every branch of the block
 > - Add more options to the command other then just compiling the main.ca file in the current directory:
 >   - Ability to specify log level to be less than it is currently (no logs are outputted), or more than it is currently (the keywords and AST are outputted)
+>     - flags: l0, l1, l2...
 >   - Ability to run the program after it has compiled if the compilation was succesful
+>     - command: run
 >   - Ability to automatically recompile the program when the source files are edited
+>     - flag: watch
 >   - Ability to compile a main.ca file from another directory
+>     - the command arg
+>   - Commands:
+>     - Run
+>     - Compile
+>     - Help
+>   - Flags:
+>     - watch
+>     - log-level
 > - Internal go code: Add actual error messages when the `assert` statements fail, rather then just a stack trace
 
 # More things to do
@@ -59,15 +72,46 @@ A list of some other things that need doing before a V1.0 release:
   - Which syscalls are used by the function (and all the functions it calls)
   - If that function or any function that it calls use the `sysret` instruction
   - What side affects are caused by that function and all of the functions that it calls
-- Macros
+- Macros:
+  - Uses of macros:
+    - Implementing language features without updating the compiler:
+      - Function overloading -> comptime map
+      - Type system -> comptime struct with a type as a comptime enum and a value
+      - Memory safety garuntees -> a way to enforce that code follows some style guidelines
+      - Automatically building a function to serialize and desirialize structs (like serde)
+      - Things that need direct access to jump to be implemented as performantly as possible:
+        - Switch statements
+        - If statements
+        - Loops
+        - Defer and errdefer statements
+    - Transforming data with code at compile time, EG:
+      - Counting how many charecters there are in a string at comptime before it is printed
+      - Generating prime numbers
+      - Generating domain specific code, like SQL migrations, or the react compiler
   - These could be functions that:
     - Take in:
-      - An AST of code
-      - A list of the other function definitions
+      - Either:
+        - An AST
+        - A list of keywords
+        - A stream of keywords after the macro invocation:
+          - The macro would decide when to stop accepting new keywords and let the programming language handle the following keywords instead of the macro continuing to handle keywords
+        - If macros used a list of keywords or an AST, then the macro contents would have to be wrapped in square brackets say, and that would make code ugly if it uses a lot of macros (EG a macro for if)
+        - If macros used an AST, then:
+          - The macro would not be able to use a different syntax to the main language
+          - The AST for the main language would have to be backwards compatable
+        - If macros used keywords as input, then they would have to be able to specify a way to format the keywords that are passed to the macro
+      - A list of the other function and/or variable definitions
     - Return either:
-      - An AST of common assembly code
+      - An AST of common assembly code (ideally the compiler would enforce that the macro always outputs a valid AST)
       - A list of errors present in the AST argument
-  - These could be called like `macro!(AST)`
+    - Like [rust](https://doc.rust-lang.org/book/ch19-06-macros.html)
+  - These could be functions that run at compile time to return other functions to run at runtime:
+    - The problem with this is that this abstraction is too high level for common assembly (as it is right now):
+      - Code that runs at compile time should not have to do register allocation, since performance of compiletime code is not that important
+        - If register allocation isn't implemented in the compiler, then this would require seperate comptime registers to use when calling a function at compiletime
+      - Code that runs at compile time should have access to a type system
+  - These could be functions with a expand tag to make them generate code that gets put at there call site like [jai](https://jai.community/t/macros/140)
+  - These could be called like `macro!(keywords)`
 - Same developer experience as [high level assembly](https://github.com/hmhamza/hla-high-level-assembly-examples/blob/master/1.%20sumInputs.hla)
 - A way to enforce that a program follows some style guidelines by accesing the compiler
   - For example forcing a program to name variables following a certain convention
@@ -185,6 +229,7 @@ A list of some other things that need doing before a V1.0 release:
     - Search for prime numbers
     - Find a number's factorial
     - JSON decoding and encoding
+    - Search for [Munchausen numbers](https://en.wikipedia.org/wiki/Perfect_digit-to-digit_invariant)
   - Run the performance benchmark
   - Print the result of the performace benchmark to stdout
 
