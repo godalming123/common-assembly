@@ -131,14 +131,18 @@ A list of some other things that need doing before a V1.0 release:
     - Debugging, or the ability to generate executables with good debug symbols that work with debuggers and hot reload togethor
     - Generates optimized executables (see [benchmarking common assembly](#benchmarking-common-assembly) for how we would compare this with other optimizers):
       - Is optimized from source code alone:
-        - Always: Propagate constants
-          - A global constant variable
-          - The argument of a function if it is set to the same value everywhere that the function is called
+        - Sometimes: Propagate constants:
+          - Constants include:
+            - A global constant variable
+            - The argument of a function if it is set to the same value everywhere that the function is called
+          - Always propagate constants if the size of the inline assembly is the same or less as the size of the assembly needed to reference the constant
+        - Always: Replace `startsWith(myString[index:], "ab")` with `myString[index] == 'a' && index+1 < len(myString) && myString[index+1] == 'b'`
         - Always: Simplify logic based on propagated constants, for example remove the code in an if block where the condition is `0 == 1`
         - Always: Move values that are recomputed in the same way every time a loop runs to be outside the loop given the loop runs on average more than once
         - Always: Remove unused functions
         - Always: If the same code is always ran directly before or after the same function is called, then that code can be moved into the function definition
         - Sometimes: Unzip code that branches and regathers several times with the same condition into 2 branchless paths
+        - Always: Replace `c := 0; for a < b {c += a; a += 1}` with `c := max(b-a, 0) * (a+b-1) / 2`
       - Is optimized from source code and assembly code:
         - Always: Use registers instead of the heap or stack
         - Sometimes: Inline code, with the following aspects making code more likely to be inlined:
@@ -228,8 +232,29 @@ A list of some other things that need doing before a V1.0 release:
     - Sort a list
     - Search for prime numbers
     - Find a number's factorial
-    - JSON decoding and encoding
+    - Decoding and encoding for JSON and TOML
     - Search for [Munchausen numbers](https://en.wikipedia.org/wiki/Perfect_digit-to-digit_invariant)
+    - Run this code:
+      ```go
+      func testOptimizationUnoptimized(a int, b int) int {
+          c := a + b
+          for a < c {
+              a += 1
+              b -= a
+          }
+          return b
+      }
+      ```
+      To test if a compiler can optimize it into this code:
+      ```go
+      func testOptimizationOptimized(a int, b int) {
+          mult := 0
+          if b > 0 {
+              mult = b
+          }
+          return b - (mult * (a + (b+1)/2))
+      }
+      ```
   - Run the performance benchmark
   - Print the result of the performace benchmark to stdout
 
@@ -246,6 +271,9 @@ A list of performance improvements compared to low level languages such as C/C++
   - Can reuse previously allocated data in new allocations, provided the previous data is not used again
 - Pointers are unique by default, so the compiler can produce better optimizations by making more assumptions about the code
 - All of the code is optimized in one compilation unit, so the optimizer knows exactly what the code in other files and libraries does, rather than having to guess
+- The compiler, language, and tooling help the programmer to optimize their code:
+  - There should be some representation of the optimized code that the compiler generates at it's lowest level that is still CPU architecture independent
+  - There could be a language feature for each function to specify another function to generate it's fuzzing data. Tooling could use this fuzzing data to test the performance of a function by runing the function with this fuzzing data, and creating a graph that compares the size of the function's different arguments with the time it takes to run, and it's peak memory consumption.
 - A design that de-emphasizes or does not support polymorphism, since polymorphism:
   - Requires another layer of pointer indirection
   - Makes moving code from the function definition to the function call and vice-versa harder for the optimizer
