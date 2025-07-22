@@ -279,3 +279,17 @@ mov $text, %rsi
 mov %12, %rdx
 syscall
 ```
+
+# 8. TODO: Modules and imports
+
+- Modules would be defined by creating a file with the `.mod` file extension in the root directory of the module
+  - Then, any files within that directory or any subdirectories would be part of that module
+- Modules would follow a flat structure - they cannot be nested
+- There would be 3 options for how much the definition can be accessed without using `import`:
+  - Can only be accessed from the same file (the default)
+  - Can only be accessed from files that are within the same directory as the definition
+  - Can be accessed from any file that is both:
+    - Within the same directory as the definition or a parent directory of the definition
+    - Within the same module as the definition
+- Definitions from other modules would be accessable under a prefix if they are imported in the file that is accessing the definition and marked as `public` at the definition
+- If a definition has unnecersarry permissions, the compiler would show a warning

@@ -130,6 +130,7 @@ A list of some other things that need doing before a V1.0 release:
     - A `watch` command to automatically hot reload when the code changes if there aren't any compiler errors
     - Debugging, or the ability to generate executables with good debug symbols that work with debuggers and hot reload togethor
     - Generates optimized executables (see [benchmarking common assembly](#benchmarking-common-assembly) for how we would compare this with other optimizers):
+      - [Here](https://llvm.org/docs/Passes.html) is a list of LLVM's optimization passes
       - Is optimized from source code alone:
         - Sometimes: Propagate constants:
           - Constants include:
