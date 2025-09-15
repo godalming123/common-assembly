@@ -135,7 +135,7 @@ func stringToRegister(in string) Register {
 }
 
 // Parses function arguments. This logic is also used to parse the values in return statements.
-// After a succesful execution of this function, `keywords.get()` returns the `)` for functions or
+// After a successful execution of this function, `keywords.get()` returns the `)` for functions or
 // `}` for returns at the end of the arguments.
 func parseFunctionArguments(keywords *listIterator[keyword]) ([]registerAndRawValueAndLocation, codeParsingError) {
 	if keywords.get().keywordType == DecreaseNesting {
@@ -143,7 +143,7 @@ func parseFunctionArguments(keywords *listIterator[keyword]) ([]registerAndRawVa
 	}
 	functionArguments := []registerAndRawValueAndLocation{}
 	for true {
-		register := UnkownRegister
+		register := UnknownRegister
 		if keywords.get().keywordType == RegisterKeyword {
 			// Parse register
 			register = stringToRegister(keywords.get().contents)
@@ -260,7 +260,7 @@ func parseRawValue(keywords *listIterator[keyword]) (rawValue, codeParsingError)
 	case CharValue:
 		assert(eq(keywords.get().contents[0], '\''))
 		assert(eq(keywords.get().contents[len(keywords.get().contents)-1], '\''))
-		return charecterValue{
+		return characterValue{
 			textLocation: keywords.get().location,
 			value:        keywords.get().contents[1 : len(keywords.get().contents)-1],
 		}, codeParsingError{}
@@ -414,7 +414,7 @@ func parseConditionalBlock(keywords *listIterator[keyword]) (textLocation, condi
 	// Ignore the first keyword
 	if !keywords.next() {
 		return textLocation{}, nil, nil, codeParsingError{
-			msg:          errors.New("During parsing of the conditonal block, unexpected end of keywords slice."),
+			msg:          errors.New("During parsing of the conditional block, unexpected end of keywords slice."),
 			textLocation: keywords.get().location,
 		}
 	}
@@ -459,14 +459,15 @@ func parseIfElseStatement(keywords *listIterator[keyword]) (ifElseStatement, cod
 
 	// Parse else block if there is one
 	if keywords.currentIndex+1 < len(keywords.list) {
-		if keywords.list[keywords.currentIndex+1].contents == "elif" {
+		switch keywords.list[keywords.currentIndex+1].contents {
+		case "elif":
 			assert(eq(keywords.next(), true))
 			elseBlockStatement, err := parseIfElseStatement(keywords)
 			if err.msg != nil {
 				return ifElseStatement{}, err
 			}
 			out.elseBlock = []statement{elseBlockStatement}
-		} else if keywords.list[keywords.currentIndex+1].contents == "else" {
+		case "else":
 			assert(eq(keywords.next(), true))
 			if !keywords.next() {
 				return ifElseStatement{}, codeParsingError{
@@ -605,7 +606,7 @@ func parseBlock(keywords *listIterator[keyword]) ([]statement, codeParsingError)
 func parseVariableMutationDestination(keywords *listIterator[keyword]) ([]variableMutationDestination, codeParsingError) {
 	out := []variableMutationDestination{}
 	for true {
-		current := variableMutationDestination{register: UnkownRegister, textLocation: keywords.get().location}
+		current := variableMutationDestination{register: UnknownRegister, textLocation: keywords.get().location}
 
 		if keywords.get().keywordType == RegisterKeyword {
 			current.register = stringToRegister(keywords.get().contents)
@@ -658,7 +659,7 @@ func parseVariableMutationDestination(keywords *listIterator[keyword]) ([]variab
 // into an AST item. Examples of this type of statement include:
 // - `b0 returnStatus, b1 = myFunction(b1="test", b2=myVariable)`
 // - `b0 result, b1 = power(b1=base, b2=power)`
-// - `^pointsToACharecter = 'a'`
+// - `^pointsToACharacter = 'a'`
 // After a succsesful execution of this function, keywords.get() should return
 // the keyword at end of the statement.
 func parseMutationStatement(keywords *listIterator[keyword]) (mutationStatement, codeParsingError) {
@@ -777,7 +778,7 @@ func parseFunctionDefinition(keywords *listIterator[keyword]) (functionDefinitio
 	// TODO: HACK: We currently just parse a mutation statement and than convert
 	// it into the functions args and mutated registers in order to parse a
 	// function head.
-	// Parse (for example): `b0 returnStutus, b1 = myFunction(b1="test", b2=myVariable)`
+	// Parse (for example): `b0 returnStatus, b1 = myFunction(b1="test", b2=myVariable)`
 	mutationStatement, err := parseMutationStatement(keywords)
 	if err.msg != nil {
 		return functionDefinition{}, err
@@ -799,7 +800,7 @@ func parseFunctionDefinition(keywords *listIterator[keyword]) (functionDefinitio
 				textLocation: mutatedItem.textLocation,
 			}
 		}
-		if mutatedItem.register == UnkownRegister {
+		if mutatedItem.register == UnknownRegister {
 			return functionDefinition{}, codeParsingError{
 				msg:          errors.New("Expected the register to be specified"),
 				textLocation: mutatedItem.textLocation,
@@ -814,7 +815,7 @@ func parseFunctionDefinition(keywords *listIterator[keyword]) (functionDefinitio
 	out.name = functionCall.functionName
 	out.arguments = make([]registerAndNameAndLocation, len(functionCall.functionArgs))
 	for i, argument := range functionCall.functionArgs {
-		if argument.register == UnkownRegister {
+		if argument.register == UnknownRegister {
 			return functionDefinition{}, codeParsingError{
 				msg:          errors.New("Expected the register to be specified"),
 				textLocation: argument.textLocation,
@@ -870,7 +871,7 @@ func parseTopLevelASTitems(bareKeywordList []keyword) ([]topLevelASTitem, codePa
 		case Import:
 			// TODO: Design and implement the ability to import other common assembly files:
 			// - Should we force their to only be one import per file that lists every dependency?
-			// - Do we even need imports? We could just automaticaly import things based on the charecters before the period (EG: `std.math.intToString 42`)
+			// - Do we even need imports? We could just automatically import things based on the characters before the period (EG: `std.math.intToString 42`)
 			//   - How do we handle overlap, for example if there was a function called std that was defined in a file in the folder?
 			return nil, codeParsingError{
 				msg:          errors.New("Import statements are not supported yet"),

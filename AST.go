@@ -1,6 +1,6 @@
 // AST.go
 // ======
-// Responsable for defining the type definitions of the abstract syntax tree.
+// Responsible for defining the type definitions of the abstract syntax tree.
 
 package main
 
@@ -11,7 +11,7 @@ package main
 // register.
 type Register int8
 
-const UnkownRegister Register = -1
+const UnknownRegister Register = -1
 
 // A register, a name, and a location. This is used to represent function arguments,
 // and function mutated registers.
@@ -75,7 +75,7 @@ type rawValue interface {
 func (_ variableValue) isRawValue()    {}
 func (_ numberValue[any]) isRawValue() {}
 func (_ stringValue) isRawValue()      {}
-func (_ charecterValue) isRawValue()   {}
+func (_ characterValue) isRawValue()   {}
 
 // Any AST item that evaluates to either true or false
 type condition interface {
@@ -126,9 +126,9 @@ type numberValue[numberType numberOf64Bits] struct {
 	value numberType
 }
 
-// Each charecter must be representable in 64 bits, since we assume that you can directly set
-// registers to charecters.
-type charecterValue struct {
+// Each character must be representable in 64 bits, since we assume that you can directly set
+// registers to characters.
+type characterValue struct {
 	textLocation
 	value string
 }

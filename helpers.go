@@ -8,7 +8,7 @@ import (
 	//"github.com/davecgh/go-spew/spew"
 )
 
-// Useful unicode charecters
+// Useful unicode characters
 const horizontalLine rune = '─'
 const verticalLine rune = '│'
 const crossingLines rune = '┼'
@@ -88,7 +88,7 @@ func codeToAssembly(code string, printLineFunc func(...any)) (string, []codePars
 }
 
 // Prints each error in `errors` with the 10 lines of code around where the
-// error occured. Assumes that `errors` is in order of their `location.line`
+// error occurred. Assumes that `errors` is in order of their `location.line`
 // property.
 func printErrorsInCode(
 	fileName string,
@@ -100,7 +100,7 @@ func printErrorsInCode(
 		return false
 	}
 	printLineFunc(ansiBold, "===============", len(errors), "errors encountered in", fileName, "===============", ansiReset)
-	charectersNeededForLineNumber := len(fmt.Sprint(errors[len(errors)-1].textLocation.line))
+	charactersNeededForLineNumber := len(fmt.Sprint(errors[len(errors)-1].textLocation.line))
 	currentErrorIndex := 0
 	shouldContinue := true
 	for shouldContinue {
@@ -110,16 +110,16 @@ func printErrorsInCode(
 			printLineFunc("...")
 		}
 		for lineNumber < groupEnd {
-			// TODO: Add code hightlighting to the line printing
+			// TODO: Add code highlighting to the line printing
 			printLineFunc(
-				addWhitespaceToStart(fmt.Sprint(lineNumber+1), charectersNeededForLineNumber+1),
+				addWhitespaceToStart(fmt.Sprint(lineNumber+1), charactersNeededForLineNumber+1),
 				string(verticalLine),
 				fileLines[lineNumber],
 			)
 			// For each error on the current line, print the error
 			for max(1, errors[currentErrorIndex].textLocation.line) == lineNumber+1 {
 				groupEnd = min(len(fileLines), errors[currentErrorIndex].textLocation.line+5)
-				print(strings.Repeat(" ", charectersNeededForLineNumber+2))
+				print(strings.Repeat(" ", charactersNeededForLineNumber+2))
 				for index, char := range fileLines[lineNumber] {
 					if index >= errors[currentErrorIndex].textLocation.column-1 {
 						break
@@ -146,14 +146,14 @@ func printErrorsInCode(
 func printTableSymbolsRow(
 	leftSymbol rune,
 	cellSymbol rune,
-	cellSeperatorSymbol rune,
+	cellSeparatorSymbol rune,
 	rightSymbol rune,
 	columnWidths ...int,
 ) {
 	print(string(leftSymbol))
 	for i, columnWidth := range columnWidths {
 		if i > 0 {
-			print(string(cellSeperatorSymbol))
+			print(string(cellSeparatorSymbol))
 		}
 		for i := 0; i < columnWidth+2; i++ {
 			print(string(cellSymbol))

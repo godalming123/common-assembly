@@ -2,8 +2,8 @@
 > Some of the examples in these docs use the `print` function, which is defined like so:
 >
 > ```
-> r0 exitCode, r5 = print(r4=textToPrint, r3=numberOfCharecters) {
->   return r0=sysWrite(r5=1, textToPrint, numberOfCharecters)
+> r0 exitCode, r5 = print(r4=textToPrint, r3=numberOfCharacters) {
+>   return r0=sysWrite(r5=1, textToPrint, numberOfCharacters)
 > }
 > ```
 
@@ -43,7 +43,7 @@ r0, r5 = print(r4="Text to print\n", r3=14)
 
 # 2. Variables
 
-If you want to save the value in a register for more then one function call, then you have to reserve the register with a specefic variable. To do this, add the variable name next to a place in the code where the register is mutated:
+If you want to save the value in a register for more then one function call, then you have to reserve the register with a specific variable. To do this, add the variable name next to a place in the code where the register is mutated:
 
 ```
 r0 returnCode, r5 = print(r4="Testing variables\n", r3=18)
@@ -52,7 +52,7 @@ if returnCode != 0 {
 }
 ```
 
-Registers that are reserved for use with a specefic variable are used by naming the variable alone, and cannot be used by naming the register:
+Registers that are reserved for use with a specific variable are used by naming the variable alone, and cannot be used by naming the register:
 
 ```
 r0 returnCode, r5 = print(r4="Testing variables\n", r3=18)
@@ -173,7 +173,7 @@ fn r0 onScreen = pointIsOnScreen(r0=screenWidth, r1=screenHeight, r2=pointX, r3=
   return r0=0
 }
 
-fn r0 digit = charecterIsDigit(r0=char) {
+fn r0 digit = characterIsDigit(r0=char) {
   if '0' <= char <= '9' or char == '.' {
     return r0=1
   }
@@ -188,7 +188,7 @@ while true {
   # This code is ran until `break`
 }
 while false {
-  # Thid code is never ran
+  # This code is never ran
 }
 ```
 
@@ -262,8 +262,8 @@ fn r0 result, r1 = pow(r2=base, r1=power) {
 
 Common assembly provides the following syscall functions:
 
-- `r0 exitCode: i64 = sysRead (r5=fileDescriptor: i64, r4=buffer: pointer, r3=numberOfCharecters: i64)`
-- `r0 exitCode: i64 = sysWrite (r5=fileDescriptor: i64, r4=text: i64, r3=numberOfCharecters: i64)`
+- `r0 exitCode: i64 = sysRead (r5=fileDescriptor: i64, r4=buffer: pointer, r3=numberOfCharacters: i64)`
+- `r0 exitCode: i64 = sysWrite (r5=fileDescriptor: i64, r4=text: i64, r3=numberOfCharacters: i64)`
 - `r0 fileDescriptor: i64 = sysOpen (r5=fileName: pointer, r4=flags: i64, r3=mode: i64)`
 - `r0 exitCode: i64 = sysClose (r5=fileDescriptor: i64)`
 - `r0 exitCode: i64 = sysBrk (r5=newBreak: i64)`
@@ -291,5 +291,5 @@ syscall
   - Can be accessed from any file that is both:
     - Within the same directory as the definition or a parent directory of the definition
     - Within the same module as the definition
-- Definitions from other modules would be accessable under a prefix if they are imported in the file that is accessing the definition and marked as `public` at the definition
+- Definitions from other modules would be accessible under a prefix if they are imported in the file that is accessing the definition and marked as `public` at the definition
 - If a definition has unnecersarry permissions, the compiler would show a warning

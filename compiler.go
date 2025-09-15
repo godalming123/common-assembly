@@ -20,9 +20,9 @@ type individualRegisterState struct {
 	stopVariableFromBeingDropped bool
 
 	// A variable name can be defined at a different location to where the register was defined as
-	// mutatable, for example:
+	// mutable, for example:
 	// fn b0 = myFunc() {
-	//  # ^ register was defined as mutatable here
+	//  # ^ register was defined as mutable here
 	//     b0 name = "John"
 	//      # ^ variable name was defined here
 	// }
@@ -31,9 +31,9 @@ type individualRegisterState struct {
 	variableNameWasDefinedAt textLocation
 
 	// This location is saved so that the compiler can warn the user if a register that was defined as
-	// mutatable is not mutated. If registerWasDefinedAsMutatableAt == textLocation{}, then this
-	// register was not defined as mutatable.
-	registerWasDefinedAsMutatableAt textLocation
+	// mutable is not mutated. If registerWasDefinedAsMutableAt == textLocation{}, then this
+	// register was not defined as mutable.
+	registerWasDefinedAsMutableAt textLocation
 }
 
 type registerState struct {
@@ -295,9 +295,9 @@ func (state *compilerState) compileFunctionCallArguments(
 	functionArguments []registerAndRawValueAndLocation,
 	regState *registerState,
 
-	// Wether to check for if a variable is mutated without naming the variable by naming the register
+	// Whether to check for if a variable is mutated without naming the variable by naming the register
 	// associated with the variable. This is turned off when this function is used to compile return
-	// statements, since in that case it does not matter if a variable declared in the fuction is
+	// statements, since in that case it does not matter if a variable declared in the function is
 	// implicitly mutated since the function is being returned from.
 	checkImplicitVariableMutation bool,
 ) (
@@ -309,7 +309,7 @@ func (state *compilerState) compileFunctionCallArguments(
 	registers := []registerAndLocation{}
 	for _, arg := range functionArguments {
 		argRegister := arg.register
-		if argRegister == UnkownRegister {
+		if argRegister == UnknownRegister {
 			variableParsed, isVariable := arg.value.(variableValue)
 			if !isVariable {
 				return "", []registerAndLocation{}, []codeParsingError{{
@@ -327,7 +327,7 @@ func (state *compilerState) compileFunctionCallArguments(
 				return "", []registerAndLocation{}, []codeParsingError{err}
 			}
 		} else {
-			if regState.registers[argRegister].registerWasDefinedAsMutatableAt.line == 0 {
+			if regState.registers[argRegister].registerWasDefinedAsMutableAt.line == 0 {
 				return "", []registerAndLocation{}, []codeParsingError{{
 					textLocation: arg.textLocation,
 					msg:          errors.New("It is not possible to mutate the register r" + fmt.Sprint(argRegister) + "."),
@@ -370,14 +370,14 @@ func (state *compilerState) compileFunctionCallArguments(
 // - A register that is reserved for a variable is implicityly mutated without naming the variable
 // - An undefined variable has been mutated
 // - A defined variable has been re-defined
-// - A register that the surrounding function does not mark as mutatable has been mutated
+// - A register that the surrounding function does not mark as mutable has been mutated
 func validateVariableMutationDestination(mutatedValue variableMutationDestination, regState *registerState) (Register, []codeParsingError) {
 	// Initialise variables
-	registerTheVariableWasAlreadyDefinedToUse := UnkownRegister
+	registerTheVariableWasAlreadyDefinedToUse := UnknownRegister
 	errs := []codeParsingError{}
 
 	// Handle the mutated register if there is one
-	if mutatedValue.register != UnkownRegister {
+	if mutatedValue.register != UnknownRegister {
 		// Check if the register is already reserved for another variable
 		if regState.registers[mutatedValue.register].variableName != "" {
 			add(&errs, codeParsingError{
@@ -442,7 +442,7 @@ func validateVariableMutationDestination(mutatedValue variableMutationDestinatio
 
 	// Get the register the user mutated
 	register := mutatedValue.register
-	if register == UnkownRegister {
+	if register == UnknownRegister {
 		assert(notEq(registerTheVariableWasAlreadyDefinedToUse, -1))
 		register = registerTheVariableWasAlreadyDefinedToUse
 	} else {
@@ -451,7 +451,7 @@ func validateVariableMutationDestination(mutatedValue variableMutationDestinatio
 
 	// Handle if the user tried to mutate a register that the surrounding function does not explicitly
 	// mutate
-	if regState.registers[register].registerWasDefinedAsMutatableAt.line == 0 {
+	if regState.registers[register].registerWasDefinedAsMutableAt.line == 0 {
 		add(&errs, codeParsingError{
 			msg: errors.New("You cannot mutate the r" + fmt.Sprint(register) + " register unless you add " +
 				"it to the list of registers that the function mutates."),
@@ -461,7 +461,7 @@ func validateVariableMutationDestination(mutatedValue variableMutationDestinatio
 
 	// Return if there are errors
 	if len(errs) != 0 {
-		return UnkownRegister, errs
+		return UnknownRegister, errs
 	}
 
 	// Handle updating register states
@@ -476,7 +476,7 @@ func validateVariableMutationDestination(mutatedValue variableMutationDestinatio
 	return register, []codeParsingError{}
 }
 
-// Compiles a variableMutation ASTitem of type Assigment, PlusEquals, MinusEquals, MultiplyEquals or DivideEquals into assembly
+// Compiles a variableMutation ASTitem of type Assignment, PlusEquals, MinusEquals, MultiplyEquals or DivideEquals into assembly
 func (state *compilerState) compileVariableMutation(
 	instruction string,
 	source rawValue,
@@ -510,7 +510,7 @@ func (state *compilerState) compileVariableMutation(
 			msg: errors.New("Without giving a register a variable name, the value that" +
 				" you assign to the register here cannot be used later, so there is no" +
 				" point in assigning a value to a register without reserving the register" +
-				" for use with a specefic variable."),
+				" for use with a specific variable."),
 		}}
 	}
 
@@ -520,7 +520,7 @@ func (state *compilerState) compileVariableMutation(
 		commonAssemblyRegisterToX86Register(register) +
 		strings.Repeat(")", int(destination[0].pointerDereferenceLayers))
 
-	// Get the assembly for the source if a source is specefied
+	// Get the assembly for the source if a source is specified
 	if source == nil {
 		return "\n" + instruction + " " + mutatedRegisterAssembly, []codeParsingError{}
 	} else {
@@ -532,7 +532,7 @@ func (state *compilerState) compileVariableMutation(
 	}
 }
 
-// Compiles a functionCall ASTitem of type Assigment, PlusEquals, MinusEquals, MultiplyEquals or DivideEquals into assembly
+// Compiles a functionCall ASTitem of type Assignment, PlusEquals, MinusEquals, MultiplyEquals or DivideEquals into assembly
 func (state *compilerState) compileFunctionCall(
 	destination []variableMutationDestination,
 	operation setToFunctionCallValue,
@@ -594,7 +594,7 @@ func (state *compilerState) compileFunctionCall(
 		functionExpectedArgRegisters = mapList(
 			siblingFunctions[operation.functionName].arguments,
 			func(r registerAndNameAndLocation) Register {
-				assert(notEq(r.register, UnkownRegister))
+				assert(notEq(r.register, UnknownRegister))
 				return r.register
 			},
 		)
@@ -675,7 +675,7 @@ func (state *compilerState) compileFunctionCall(
 				msg: errors.New("Function call stores the final value that the r" +
 					fmt.Sprint(destination[i].register) + " register was mutated to in a new " +
 					"variable called `" + destination[i].name + "`, but the function " +
-					"definition does not garuntee that it will muatate that register."),
+					"definition does not guarantee that it will muatate that register."),
 			}}
 		}
 	}
@@ -697,14 +697,14 @@ func parseFunctionDefinitionRegisters(
 		if register.name != "" {
 			add(&out.functionReturnValueRegisters, register.register)
 		}
-		if out.registers[register.register].registerWasDefinedAsMutatableAt.line != 0 {
+		if out.registers[register.register].registerWasDefinedAsMutableAt.line != 0 {
 			errMsg := errors.New("Register " + register.name + " used twice in mutated registers")
 			return registerState{}, []codeParsingError{
-				{msg: errMsg, textLocation: out.registers[register.register].registerWasDefinedAsMutatableAt},
+				{msg: errMsg, textLocation: out.registers[register.register].registerWasDefinedAsMutableAt},
 				{msg: errMsg, textLocation: register.textLocation},
 			}
 		}
-		out.registers[register.register].registerWasDefinedAsMutatableAt = register.textLocation
+		out.registers[register.register].registerWasDefinedAsMutableAt = register.textLocation
 	}
 
 	// Parse the function args
@@ -802,7 +802,7 @@ func compileAssembly(AST []topLevelASTitem) (string, []codeParsingError) {
 				line:   1,
 				column: 1,
 			},
-			msg: errors.New("Could not find main function defintion"),
+			msg: errors.New("Could not find main function definition"),
 		}}
 	}
 
@@ -819,7 +819,7 @@ func compileAssembly(AST []topLevelASTitem) (string, []codeParsingError) {
 	// TODO: Change the return code for platforms other then linux X86-64
 	state.transformFunctionDefinitionIntoValidAssembly("main", "mov $60, %rax\nmov $0, %rdi\nsyscall")
 
-	// Concatanate the output
+	// Concatenate the output
 	out := ".global " + state.compiledFunctions["main"].jumpLabel + "\n.text" + state.dataSection
 	for _, function := range state.compiledFunctions {
 		out += function.assembly
@@ -847,12 +847,13 @@ func (state *compilerState) transformFunctionDefinitionIntoValidAssembly(functio
 
 	// Change `functionDefinition.assembly` so that it is valid assembly
 	functionDefinition.assembly = "\n" + functionDefinition.jumpLabel + ":" + functionDefinition.assembly
-	charecterIsSingleQuoteString := false
+	characterIsSingleQuoteString := false
 	for index := 0; index < len(functionDefinition.assembly); index++ {
 		if functionDefinition.assembly[index] == '\'' {
-			charecterIsSingleQuoteString = !charecterIsSingleQuoteString
-		} else if !charecterIsSingleQuoteString {
-			if functionDefinition.assembly[index] == '/' {
+			characterIsSingleQuoteString = !characterIsSingleQuoteString
+		} else if !characterIsSingleQuoteString {
+			switch functionDefinition.assembly[index] {
+			case '/':
 				startIndex := index
 				index++
 				assert(lessThan(index, len(functionDefinition.assembly)))
@@ -864,7 +865,7 @@ func (state *compilerState) transformFunctionDefinitionIntoValidAssembly(functio
 					functionDefinition.assembly[:startIndex] +
 						state.getAssemblyForFunctionCall(functionDefinition.assembly[startIndex+1:index]) +
 						functionDefinition.assembly[index+1:]
-			} else if functionDefinition.assembly[index] == '\\' {
+			case '\\':
 				functionDefinition.assembly = functionDefinition.assembly[:index] +
 					returnAssembly + functionDefinition.assembly[index+1:]
 			}
@@ -901,7 +902,7 @@ func getRegisterFromVariableName(
 	for regState.registers[register].variableName != variableName {
 		register++
 		if register >= Register(len(regState.registers)) {
-			return UnkownRegister, codeParsingError{
+			return UnknownRegister, codeParsingError{
 				textLocation: variableLocation,
 				msg:          errors.New("Could not find a variable called `" + variableName + "`"),
 			}
@@ -915,15 +916,15 @@ func getRegisterFromVariableName(
 
 	// Check that dropping the variable is valid
 	if regState.registers[register].stopVariableFromBeingDropped {
-		return UnkownRegister, codeParsingError{
+		return UnknownRegister, codeParsingError{
 			textLocation: variableLocation,
 			msg:          errors.New("You cannot drop the `" + variableName + "` variable in this scope since the variable is declared outside this scope"),
 		}
 	}
-	if regState.registers[register].registerWasDefinedAsMutatableAt.line == 0 {
-		return UnkownRegister, codeParsingError{
+	if regState.registers[register].registerWasDefinedAsMutableAt.line == 0 {
+		return UnknownRegister, codeParsingError{
 			textLocation: variableLocation,
-			msg: errors.New("Without this register (r" + fmt.Sprint(register) + ") being mutatable, " +
+			msg: errors.New("Without this register (r" + fmt.Sprint(register) + ") being mutable, " +
 				"you cannot reserve this register for another variable after you have dropped the old " +
 				"variable ( `" + variableName + "`) at this line of code. You also won't be able to mutate " +
 				"this register after you have dropped it. So there is no point in dropping this variable."),
@@ -962,7 +963,7 @@ func (state *compilerState) convertValueToAssembly(regState *registerState, unty
 		dataSectionLabelForString := state.createNewDataSectionLabel()
 		state.dataSection += "\n" + dataSectionLabelForString + ": .ascii \"" + value.value + "\""
 		return "$" + dataSectionLabelForString, codeParsingError{}
-	case charecterValue:
+	case characterValue:
 		return "$'" + value.value + "'", codeParsingError{}
 	default:
 		panic("Unexpected internal state")
@@ -977,7 +978,7 @@ func isValidLastOperandForMoveAndCmpInstructions(value rawValue) bool {
 }
 
 // `jumpToOnTrue` and `jumpToOnFalse` can be blank strings, which means that the
-// assembly should just continue executing if the conditions evauluates to that.
+// assembly should just continue executing if the conditions evaluates to that.
 func (state *compilerState) conditionToAssembly(
 	regState *registerState,
 	untypedCondition condition,

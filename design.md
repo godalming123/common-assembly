@@ -2,7 +2,7 @@
 
 <table>
   <tr>
-    <th colspan="2">Challanges</th>
+    <th colspan="2">Challenges</th>
     <th>Solutions</th>
   </tr>
   <tr>
@@ -11,7 +11,7 @@
   </tr>
   <tr>
     <td colspan="2">Variable mutation during a function being ran</td>
-    <td>Define (at the function defintion and the function call) which variables it mutates, and have const by default</td>
+    <td>Define (at the function definition and the function call) which variables it mutates, and have const by default</td>
   </tr>
   <tr>
     <td rowspan="2">Unexpected/unhandled errors</td>

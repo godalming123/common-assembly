@@ -23,10 +23,10 @@ printNameWithoutExcessWhitespace :: (mutArg name *byte, mutArg printLeadingWhite
 	}
 }
 
-# Reads any number of charecter bytes from stdin using arena allocators.
+# Reads any number of character bytes from stdin using arena allocators.
 # `stringPtr` is set to the string that was read with a null terminator at the
 # end. Arena allocators are allocators that initialise themselves by reserving
-# a large contigous set of memory addresses in the address space. This does not
+# a large contiguous set of memory addresses in the address space. This does not
 # use any actual RAM. Then, when memory is allocated, the allocator tells the OS
 # to find chunks of actual memory for the addresses in the address space to
 # point to. More information: https://youtu.be/A9WLYbE0p-I
@@ -34,7 +34,7 @@ readInput :: (alloc arenaAllocator, mut stringPtr *byte, mut internalStringPtr *
 	alloc.allocate stringPtr
 	internalStringPtr = stringPtr
 	while true do {
-		syscallReadCharecter stdin, internalStringPtr
+		syscallReadCharacter stdin, internalStringPtr
 		if *internalStringPtr == '\0' { # The user stopped entering input
 			return
 		}

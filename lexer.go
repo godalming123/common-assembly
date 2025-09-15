@@ -195,25 +195,25 @@ type codeParsingError struct {
 // OTHER  HELPER CODE //
 ////////////////////////
 
-func isNotIgnoreableWhitespace(charecter byte) bool {
-	if charecter == ' ' || charecter == '\t' || charecter == '\r' {
+func isNotIgnorableWhitespace(character byte) bool {
+	if character == ' ' || character == '\t' || character == '\r' {
 		return false
 	}
 	return true
 }
 
-func isNotNumber(charecter byte) bool {
-	if ('0' <= charecter && charecter <= '9') || charecter == '_' {
+func isNotNumber(character byte) bool {
+	if ('0' <= character && character <= '9') || character == '_' {
 		return false
 	}
 	return true
 }
 
-func isNotVariableCharecter(charecter byte) bool {
-	if ('a' <= charecter && charecter <= 'z') ||
-		('A' <= charecter && charecter <= 'Z') ||
-		('0' <= charecter && charecter <= '9') ||
-		charecter == '_' {
+func isNotVariableCharacter(character byte) bool {
+	if ('a' <= character && character <= 'z') ||
+		('A' <= character && character <= 'Z') ||
+		('0' <= character && character <= '9') ||
+		character == '_' {
 		return false
 	}
 	return true
@@ -254,7 +254,7 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 	var parsingErrors []codeParsingError
 	var nesting uint8
 
-	for text.findUntil(isNotIgnoreableWhitespace) {
+	for text.findUntil(isNotIgnorableWhitespace) {
 		keywordType := Unknown
 		keywordContents := ""
 		keywordPosition := text.location
@@ -268,8 +268,8 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 			}
 		case '#':
 			keywordType = Comment
-			keywordContents = text.findUntilWithIteratedString(func(charecter byte) bool {
-				if charecter == '\n' {
+			keywordContents = text.findUntilWithIteratedString(func(character byte) bool {
+				if character == '\n' {
 					return true
 				}
 				return false
@@ -290,7 +290,7 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 			keywordContents = "'"
 			if text.moveForward() {
 				add(&parsingErrors, codeParsingError{
-					msg:          errors.New("Unexpected end of text while parsing charecter value"),
+					msg:          errors.New("Unexpected end of text while parsing character value"),
 					textLocation: text.location,
 				})
 			}
@@ -298,7 +298,7 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 				keywordContents += "\\"
 				if text.moveForward() {
 					add(&parsingErrors, codeParsingError{
-						msg:          errors.New("Unexpected end of text while parsing charecter value"),
+						msg:          errors.New("Unexpected end of text while parsing character value"),
 						textLocation: text.location,
 					})
 				}
@@ -306,13 +306,13 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 			keywordContents += string(text.text[text.index]) + "'"
 			if text.moveForward() {
 				add(&parsingErrors, codeParsingError{
-					msg:          errors.New("Unexpected end of text while parsing charecter value"),
+					msg:          errors.New("Unexpected end of text while parsing character value"),
 					textLocation: text.location,
 				})
 			}
 			if text.text[text.index] != '\'' {
 				add(&parsingErrors, codeParsingError{
-					msg:          errors.New("Expected `'' to end charecter value, got `" + string(text.text[text.index]) + "`"),
+					msg:          errors.New("Expected `'' to end character value, got `" + string(text.text[text.index]) + "`"),
 					textLocation: text.location,
 				})
 			}
@@ -322,8 +322,8 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 			keywordType = StringValue
 			keywordContents = "\""
 			text.moveForward()
-			keywordContents += text.findUntilWithIteratedString(func(charecter byte) bool {
-				if charecter == '"' {
+			keywordContents += text.findUntilWithIteratedString(func(character byte) bool {
+				if character == '"' {
 					return true
 				}
 				return false
@@ -337,13 +337,13 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 			// whitespace to the string.
 			keywordContents = string(text.text[text.index])
 			text.moveForward()
-			text.findUntil(func(charecter byte) bool {
-				if !isNotIgnoreableWhitespace(charecter) {
+			text.findUntil(func(character byte) bool {
+				if !isNotIgnorableWhitespace(character) {
 					return false
 				}
-				switch charecter {
+				switch character {
 				case ':', '=', '|', '<', '>', '&', '+', '-', '*', '/', '.', '%':
-					keywordContents += string(charecter)
+					keywordContents += string(character)
 					return false
 				}
 				return true
@@ -394,7 +394,7 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 					msg: errors.New(
 						"Unknown symbols series `" +
 							keywordContents +
-							"`. Known symbol serieses are (, {, [, ), }, ], #, :=, ::, =, |>, ==, ||, &&, <=, >=, <, >, +, -, *, /, %, ,, ..., .., .",
+							"`. Known symbol series are (, {, [, ), }, ], #, :=, ::, =, |>, ==, ||, &&, <=, >=, <, >, +, -, *, /, %, ,, ..., .., .",
 					),
 					textLocation: keywordPosition,
 				})
@@ -403,7 +403,7 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 
 		case '_', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z':
-			keywordContents = text.findUntilWithIteratedString(isNotVariableCharecter)
+			keywordContents = text.findUntilWithIteratedString(isNotVariableCharacter)
 			switch keywordContents {
 			case "fn":
 				keywordType = Function
@@ -436,13 +436,13 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 				keywordType = Or
 			default:
 				keywordType = Name
-				text.findUntil(isNotIgnoreableWhitespace)
+				text.findUntil(isNotIgnorableWhitespace)
 				if text.text[text.index] == '.' {
 					keywordContents += "."
 					text.index++
-					text.findUntil(isNotIgnoreableWhitespace)
-					keywordContents += text.findUntilWithIteratedString(func(charecter byte) bool {
-						if ('0' <= charecter && charecter <= '9') || charecter == '_' {
+					text.findUntil(isNotIgnorableWhitespace)
+					keywordContents += text.findUntilWithIteratedString(func(character byte) bool {
+						if ('0' <= character && character <= '9') || character == '_' {
 							return false
 						}
 						return true
@@ -462,7 +462,7 @@ func lexCode(code string) ([]keyword, []codeParsingError) {
 		default:
 			add(&parsingErrors, codeParsingError{
 				msg: errors.New(
-					"Unexpected charecter: `" + string(text.text[text.index]) + "`",
+					"Unexpected character: `" + string(text.text[text.index]) + "`",
 				),
 				textLocation: keywordPosition,
 			})

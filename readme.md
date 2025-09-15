@@ -5,7 +5,7 @@
 >
 > - Fix /= and *=
 > - Rework parts of `compiler.go` so that it creates one a strongly-typed set of instructions that can be converted into every archicetecture with the minimal possible code
->   - Suppport more compilation targets other then just linux x86-64
+>   - Support more compilation targets other then just linux x86-64
 >   - Fix the assembler warnings that say "no instruction mnemonic suffix given and no register operands; using default for `...'"
 > - Add support for floats
 > - A (very basic) cross-platform standard library:
@@ -16,8 +16,8 @@
 >       - `shrinkArena`
 >       - `resetArena` - frees every item in an arena without freeing the arena itself
 >       - `deallocateArena`
->     - There would be a main arena that works by expanding and shrinking the program break rather than requesting backing memory and freeing backing memory for a large set of contiguos pages
->     - Depending on the langauge design, the operations might not be named in the code
+>     - There would be a main arena that works by expanding and shrinking the program break rather than requesting backing memory and freeing backing memory for a large set of contiguous pages
+>     - Depending on the language design, the operations might not be named in the code
 > - A code highlighter
 > - Support for importing one file from another
 > - While loops:
@@ -25,12 +25,12 @@
 > - Functions:
 >   - Stop the main function from always exiting the process when it returns as it could be called by another function, in which case it should jump to where it was called from instead
 >   - Add support for functions having `any` as a register
->   - Add a macro system that stops that user from manually having to count how many charecters there are in a string that the user wants to print
+>   - Add a macro system that stops that user from manually having to count how many characters there are in a string that the user wants to print
 > - Add the option to drop a variable from outside scope in the scope of an if/elif/else block as long as the variable is dropped in every branch of the block
 > - Add more options to the command other then just compiling the main.ca file in the current directory:
 >   - Ability to specify log level to be less than it is currently (no logs are outputted), or more than it is currently (the keywords and AST are outputted)
 >     - flags: l0, l1, l2...
->   - Ability to run the program after it has compiled if the compilation was succesful
+>   - Ability to run the program after it has compiled if the compilation was successful
 >     - command: run
 >   - Ability to automatically recompile the program when the source files are edited
 >     - flag: watch
@@ -68,7 +68,7 @@ A list of some other things that need doing before a V1.0 release:
 - The ability for the compiler to automatically run code at compile time if:
   - That code doesn't depend on any state that would change at runtime
   - The compiler can reproduce any side affects that the code creates at runtime
-- The compiler can be certain about both of these charecteristics by adding function definitions that describe:
+- The compiler can be certain about both of these characteristics by adding function definitions that describe:
   - Which syscalls are used by the function (and all the functions it calls)
   - If that function or any function that it calls use the `sysret` instruction
   - What side affects are caused by that function and all of the functions that it calls
@@ -85,7 +85,7 @@ A list of some other things that need doing before a V1.0 release:
         - Loops
         - Defer and errdefer statements
     - Transforming data with code at compile time, EG:
-      - Counting how many charecters there are in a string at comptime before it is printed
+      - Counting how many characters there are in a string at comptime before it is printed
       - Generating prime numbers
       - Generating domain specific code, like SQL migrations, or the react compiler
   - These could be functions that:
@@ -98,7 +98,7 @@ A list of some other things that need doing before a V1.0 release:
         - If macros used a list of keywords or an AST, then the macro contents would have to be wrapped in square brackets say, and that would make code ugly if it uses a lot of macros (EG a macro for if)
         - If macros used an AST, then:
           - The macro would not be able to use a different syntax to the main language
-          - The AST for the main language would have to be backwards compatable
+          - The AST for the main language would have to be backwards compatible
         - If macros used keywords as input, then they would have to be able to specify a way to format the keywords that are passed to the macro
       - A list of the other function and/or variable definitions
     - Return either:
@@ -108,12 +108,12 @@ A list of some other things that need doing before a V1.0 release:
   - These could be functions that run at compile time to return other functions to run at runtime:
     - The problem with this is that this abstraction is too high level for common assembly (as it is right now):
       - Code that runs at compile time should not have to do register allocation, since performance of compiletime code is not that important
-        - If register allocation isn't implemented in the compiler, then this would require seperate comptime registers to use when calling a function at compiletime
+        - If register allocation isn't implemented in the compiler, then this would require separate comptime registers to use when calling a function at compiletime
       - Code that runs at compile time should have access to a type system
   - These could be functions with a expand tag to make them generate code that gets put at there call site like [jai](https://jai.community/t/macros/140)
   - These could be called like `macro!(keywords)`
 - Same developer experience as [high level assembly](https://github.com/hmhamza/hla-high-level-assembly-examples/blob/master/1.%20sumInputs.hla)
-- A way to enforce that a program follows some style guidelines by accesing the compiler
+- A way to enforce that a program follows some style guidelines by accessing the compiler
   - For example forcing a program to name variables following a certain convention
   - This could be achieved with a macro that wraps the code that you want to enforce the convention for
 - An `assert` function that dumps the program state if a condition is not met
@@ -126,7 +126,7 @@ A list of some other things that need doing before a V1.0 release:
       - Give error messages for unused code, instead of ignoring most errors that can occur in functions that never get called
       - A warning for unused variables
       - Add support for printing multiple parser or compiler errors each time the compiler is ran rathor then only printing one at a time
-      - Instead of just pointing to the first charecter of a keyword, the errors should point to the whole keyword
+      - Instead of just pointing to the first character of a keyword, the errors should point to the whole keyword
     - A `watch` command to automatically hot reload when the code changes if there aren't any compiler errors
     - Debugging, or the ability to generate executables with good debug symbols that work with debuggers and hot reload togethor
     - Generates optimized executables (see [benchmarking common assembly](#benchmarking-common-assembly) for how we would compare this with other optimizers):
@@ -153,7 +153,7 @@ A list of some other things that need doing before a V1.0 release:
           - The size of the function call code is large
         - Always: Tail call optimizations
         - Always: Optimize array math to use SIMD
-        - Always: Switch from using the `call` and `ret` instructons to using `jmp` instructions for functions that are used once
+        - Always: Switch from using the `call` and `ret` instructions to using `jmp` instructions for functions that are used once
       - Is optimized from assembly code alone:
         - Always: If a jump label is never jumped to, and the code above the jump label always goes somewhere else, then the code between the jump label and the next jump label can be removed
         - Always: For arm, optimize `a = b; a += c` into `a = b + c`
@@ -162,7 +162,7 @@ A list of some other things that need doing before a V1.0 release:
           - `compare REG1, REG2; jump_not_equal a; move REG3, REG4; a: ...` -> `compare REG1, REG2; move_equal REG3, REG4; ...`
         - Always: Use left shifts and right shifts instead of dividing/multiplying by powers of 2
         - Always: If there is a jump statement that jumps to another jump statement, then modify the first jump statement to jump directly to where the second jump statement jumps to
-    - Suppports lots of compilation targets:
+    - Supports lots of compilation targets:
       - WASM
       - X86-64
       - Arm64
@@ -188,7 +188,7 @@ A list of some other things that need doing before a V1.0 release:
     - Symbol documentation
     - Symbol rename
     - Symbol picker
-    - Refactor code into a seperate function
+    - Refactor code into a separate function
   - A way to generate docs based on code comments (works on an AST)
 
 # Installation instructions for Windows
@@ -228,7 +228,7 @@ A list of some other things that need doing before a V1.0 release:
     - N-body simulation
     - Indexed access to a sequence of 12 integers
     - Generate mandlebrot set portable bitmap file
-    - Calculations with arbritrary precesion arithmatic
+    - Calculations with arbitrary precision arithmetic
     - Allocate, traverse, and deallocate binary trees
     - Sort a list
     - Search for prime numbers
@@ -257,7 +257,7 @@ A list of some other things that need doing before a V1.0 release:
       }
       ```
   - Run the performance benchmark
-  - Print the result of the performace benchmark to stdout
+  - Print the result of the performance benchmark to stdout
 
 ## Common assembly performance improvements
 
@@ -274,7 +274,7 @@ A list of performance improvements compared to low level languages such as C/C++
 - All of the code is optimized in one compilation unit, so the optimizer knows exactly what the code in other files and libraries does, rather than having to guess
 - The compiler, language, and tooling help the programmer to optimize their code:
   - There should be some representation of the optimized code that the compiler generates at it's lowest level that is still CPU architecture independent
-  - There could be a language feature for each function to specify another function to generate it's fuzzing data. Tooling could use this fuzzing data to test the performance of a function by runing the function with this fuzzing data, and creating a graph that compares the size of the function's different arguments with the time it takes to run, and it's peak memory consumption.
+  - There could be a language feature for each function to specify another function to generate it's fuzzing data. Tooling could use this fuzzing data to test the performance of a function by running the function with this fuzzing data, and creating a graph that compares the size of the function's different arguments with the time it takes to run, and it's peak memory consumption.
 - A design that de-emphasizes or does not support polymorphism, since polymorphism:
   - Requires another layer of pointer indirection
   - Makes moving code from the function definition to the function call and vice-versa harder for the optimizer
@@ -284,7 +284,7 @@ A list of performance improvements compared to low level languages such as C/C++
 - The same code works on many platforms
 - No need to call functions by manually using `call` and knowing exactly which register(s) they modify. Instead, use functions that just have a set of argument registers that the caller passes a value into for the callee to use, and a set of mutated registers that the callee can mutate to process and return data to the caller.
 - Use other peoples code with clear namespaces
-- Abstract syscalls with a set of functions in the standerd library that are OS agnostic
+- Abstract syscalls with a set of functions in the standard library that are OS agnostic
 - Abstract jump statements with:
   - While loops:
     - Break and continue statements
@@ -301,10 +301,10 @@ A list of performance improvements compared to low level languages such as C/C++
 # Code style for the go code in this repo
 
 - If you have more than 4 levels of indentation, then you need to refactor your code
-- Lines cannot be longer than 80 charecters
+- Lines cannot be longer than 80 characters
 - Function calls can be formatted in three ways:
-  - If the resulting line is <=80 charecters long, the function call is put on one line
-  - If the resulting lines are <= 80 charecters long, and there are only 2 lines, the function call can be hard-wrapped by it's arguments
+  - If the resulting line is <=80 characters long, the function call is put on one line
+  - If the resulting lines are <= 80 characters long, and there are only 2 lines, the function call can be hard-wrapped by it's arguments
   - Otherwise, each argument in the function call is given it's own line
 
 # Stargazers over time

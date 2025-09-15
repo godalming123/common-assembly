@@ -90,7 +90,7 @@ fn r0 result, r1 = pow (r0=base, r1=power) {
 		power--
 	}
 	return r0=base
-	# TODO: Support this updated code that uses the `loop` insruction in x86
+	# TODO: Support this updated code that uses the `loop` instruction in x86
 	# assembly to be faster
 	# if power <= 1 {
 	# 	return
